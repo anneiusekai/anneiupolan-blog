@@ -1,0 +1,43 @@
+---
+// src/components/BlogImage.astro
+import { Image } from 'astro:assets';
+
+interface Props {
+  src: string | ImageMetadata; // 支援 R2 網址(字串) 或 本地圖片
+  alt: string;
+  caption?: string; // 可選的說明文字
+}
+
+const { src, alt, caption } = Astro.props;
+---
+
+<figure class="blog-figure">
+  {/* 加入 inferSize={true} 讓 Astro 自動計算遠端圖片大小 */}
+  <Image src={src} alt={alt} inferSize={true} class="rounded-image" />
+  {caption && <figcaption class="blog-caption">{caption}</figcaption>}
+</figure>
+
+<style>
+  .blog-figure {
+    margin: 2rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .rounded-image {
+    border-radius: 12px;
+    max-width: 100%;
+    height: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .blog-caption {
+    margin-top: 0.8rem;
+    font-size: 0.9rem;
+    color: #718096;
+    text-align: center;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+  }
+</style>

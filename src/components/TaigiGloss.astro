@@ -1,0 +1,121 @@
+---
+// src/components/TaigiGloss.astro
+interface Props {
+  ruby?: string;        // 羅馬拼音
+  definition: string;   // 註釋內容
+}
+
+const { ruby, definition } = Astro.props;
+---
+
+<span class="taigi-gloss" tabindex="0">
+  <span class="taigi-main">
+    <slot />
+    {ruby && <span class="ruby-text">{ruby}</span>}
+  </span>
+  <span class="gloss-tooltip" role="tooltip">
+    {definition}
+  </span>
+</span>
+
+<style>
+  .taigi-gloss {
+    position: relative;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    cursor: help;
+    color: #1f4e79;
+    border-bottom: 1.5px dotted rgba(31, 78, 121, 0.45);
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease;
+    outline: none;
+  }
+
+  .taigi-gloss:hover,
+  .taigi-gloss:focus-visible {
+    color: #163a5a;
+    border-bottom-color: rgba(22, 58, 90, 0.8);
+  }
+
+  .taigi-main {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    line-height: 1.6;
+  }
+
+  .ruby-text {
+    font-size: 0.78em;
+    color: #718096;
+    background: #edf2f7;
+    padding: 0.05rem 0.38rem;
+    border-radius: 999px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .gloss-tooltip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.7rem);
+    transform: translateX(-50%) translateY(6px);
+    min-width: 180px;
+    max-width: min(320px, 80vw);
+    padding: 0.7rem 0.9rem;
+    border-radius: 12px;
+    background: rgba(26, 32, 44, 0.96);
+    color: #f7fafc;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    box-shadow:
+      0 10px 25px rgba(0, 0, 0, 0.18),
+      0 4px 10px rgba(0, 0, 0, 0.12);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease,
+      visibility 0.2s ease;
+    z-index: 30;
+  }
+
+  .gloss-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 7px;
+    border-style: solid;
+    border-color: rgba(26, 32, 44, 0.96) transparent transparent transparent;
+  }
+
+  .taigi-gloss:hover .gloss-tooltip,
+  .taigi-gloss:focus-visible .gloss-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (max-width: 640px) {
+    .gloss-tooltip {
+      left: 0;
+      transform: translateX(0) translateY(6px);
+      bottom: calc(100% + 0.6rem);
+      max-width: 85vw;
+    }
+
+    .taigi-gloss:hover .gloss-tooltip,
+    .taigi-gloss:focus-visible .gloss-tooltip {
+      transform: translateX(0) translateY(0);
+    }
+
+    .gloss-tooltip::after {
+      left: 1.2rem;
+      transform: none;
+    }
+  }
+</style>

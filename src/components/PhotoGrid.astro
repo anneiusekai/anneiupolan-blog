@@ -1,0 +1,28 @@
+---
+// src/components/PhotoGrid.astro
+interface Props {
+  columns?: number; // 預設為 2 欄
+}
+
+const { columns = 2 } = Astro.props;
+---
+
+<div class="photo-grid" style={`--cols: ${columns}`}>
+  <slot />
+</div>
+
+<style>
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+
+  /* 在手機版時自動變成單欄，避免照片太小 */
+  @media (max-width: 640px) {
+    .photo-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
