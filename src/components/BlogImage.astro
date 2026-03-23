@@ -9,11 +9,20 @@ interface Props {
 }
 
 const { src, alt, caption } = Astro.props;
+
+// 判斷是否為遠端 R2 圖片 (字串)
+const isRemoteImage = typeof src === 'string';
 ---
 
 <figure class="blog-figure">
   {/* 加入 inferSize={true} 讓 Astro 自動計算遠端圖片大小 */}
-  <Image src={src} alt={alt} inferSize={true} class="rounded-image" />
+  <Image 
+    src={src} 
+    alt={alt} 
+    inferSize={isRemoteImage} 
+    unoptimized={isRemoteImage} {/* <--- 加上這行：遠端圖片不經過 Astro 壓縮引擎 */}
+    class="rounded-image"
+  />
   {caption && <figcaption class="blog-caption">{caption}</figcaption>}
 </figure>
 
