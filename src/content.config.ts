@@ -13,7 +13,10 @@ const blog = defineCollection({
 			// Transform string to Date object
 			pubDate: z.coerce.date(),
 			updatedDate: z.coerce.date().optional(),
-			heroImage: z.optional(image()),
+			// 使用 z.union 允許兩種格式：
+			// 1. image() 會驗證本地相對路徑（如 ../../assets/pic.jpg）並回傳 Metadata
+			// 2. z.string().url() 則接受外部網址
+			heroImage: z.union([image(), z.string()]).optional(),
 		}),
 });
 
