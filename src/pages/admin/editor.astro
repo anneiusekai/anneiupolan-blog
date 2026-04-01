@@ -1,6 +1,9 @@
 ---
 // src/pages/admin/editor.astro
 
+// 新增這行：Astro v6 最新的 Cloudflare 環境變數載入方式
+import { env } from "cloudflare:workers";
+
 // 1. 定義變數來儲存給使用者的回饋訊息
 let message = "";
 
@@ -18,9 +21,8 @@ if (Astro.request.method === "POST") {
     if (!title || !slug || !content) {
       message = "❌ 標題、網址路徑與內容為必填！";
     } else {
-      // 3. 取得 Cloudflare D1 資料庫的連線實體
-      // 這就是 Astro 呼叫 Cloudflare 資源的方式
-      const db = Astro.locals.runtime.env.DB;
+      // 3. 直接從 env 取得 DB 綁定
+      const db = env.DB;
 
       // 4. 執行 SQL Insert 防範 SQL Injection (使用參數化查詢 ?)
       const { success } = await db.prepare(
