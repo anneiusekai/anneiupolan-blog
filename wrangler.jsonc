@@ -1,0 +1,22 @@
+{
+	"compatibility_date": "2026-04-01",
+	"compatibility_flags": [
+		"global_fetch_strictly_public"
+	],
+	"name": "c-users-user-repos-anneiupolan-blog",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "anneiupolan_blog_db",
+			"database_name": "anneiupolan-blog-db",
+			"database_id": "4a5222ef-6bd5-4ef9-8889-a97ca3c9c63c"
+		}
+	]
+}

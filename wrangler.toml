@@ -1,0 +1,7 @@
+name = "anneiupolan-blog" # Pages 專案名稱
+compatibility_date = "2024-04-02"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "anneiupolan-blog-db"
+database_id = "4a5222ef-6bd5-4ef9-8889-a97ca3c9c63c"

@@ -1,0 +1,94 @@
+---
+// src/pages/admin/editor.astro
+
+// 1. 定義變數來儲存給使用者的回饋訊息
+let message = "";
+
+// 2. 判斷是否為 POST 請求 (等同於 C# 的 [HttpPost] 或 OnPost)
+if (Astro.request.method === "POST") {
+  try {
+    // 解析從表單傳來的資料
+    const formData = await Astro.request.formData();
+    const title = formData.get("title")?.toString();
+    const slug = formData.get("slug")?.toString();
+    const heroImage = formData.get("heroImage")?.toString() || "";
+    const content = formData.get("content")?.toString();
+
+    // 簡單的後端驗證
+    if (!title || !slug || !content) {
+      message = "❌ 標題、網址路徑與內容為必填！";
+    } else {
+      // 3. 取得 Cloudflare D1 資料庫的連線實體
+      // 這就是 Astro 呼叫 Cloudflare 資源的方式
+      const db = Astro.locals.runtime.env.DB;
+
+      // 4. 執行 SQL Insert 防範 SQL Injection (使用參數化查詢 ?)
+      const { success } = await db.prepare(
+        "INSERT INTO Articles (Title, Slug, HeroImage, Content, IsPublished) VALUES (?, ?, ?, ?, 1)"
+      ).bind(title, slug, heroImage, content).run();
+
+      if (success) {
+        message = "🎉 文章新增成功！";
+      } else {
+        message = "❌ 寫入資料庫失敗。";
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    message = `發生錯誤：${error instanceof Error ? error.message : '未知錯誤'}`;
+  }
+}
+---
+
+<html lang="zh-TW">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>新增文章 - 台語網誌後台</title>
+    <style>
+      body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+      .form-group { margin-bottom: 1.5rem; }
+      label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+      input[type="text"], textarea { 
+        width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;
+      }
+      button { 
+        background-color: #2b6cb0; color: white; padding: 0.75rem 1.5rem; 
+        border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;
+      }
+      button:hover { background-color: #2c5282; }
+      .alert { padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px; background-color: #ebf8ff; border: 1px solid #bee3f8; }
+    </style>
+  </head>
+  <body>
+    <h1>📝 新增台語網誌文章</h1>
+
+    {/* 如果有訊息，就顯示出來 */}
+    {message && <div class="alert">{message}</div>}
+
+    {/* 表單送出時，預設會以 POST 方法送到當前網址 */}
+    <form method="POST">
+      <div class="form-group">
+        <label for="title">文章標題</label>
+        <input type="text" id="title" name="title" placeholder="例如：我的第一篇台語日記" required />
+      </div>
+
+      <div class="form-group">
+        <label for="slug">網址路徑 (Slug) - 必須是英文或數字組合</label>
+        <input type="text" id="slug" name="slug" placeholder="例如：my-first-diary" required />
+      </div>
+
+      <div class="form-group">
+        <label for="heroImage">封面圖片 R2 網址 (選填)</label>
+        <input type="text" id="heroImage" name="heroImage" placeholder="https://img.yourdomain.com/photo.jpg" />
+      </div>
+
+      <div class="form-group">
+        <label for="content">文章內容 (支援 Markdown 與 HTML 組件)</label>
+        <textarea id="content" name="content" rows="15" required placeholder="寫點什麼吧...支援 <TaigiGloss> 組件喔！"></textarea>
+      </div>
+
+      <button type="submit">💾 儲存並發布</button>
+    </form>
+  </body>
+</html>

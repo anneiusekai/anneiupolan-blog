@@ -1,28 +1,28 @@
 ---
 // src/components/BlogImage.astro
 import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
 
 interface Props {
-  src: string | ImageMetadata; // 支援 R2 網址(字串) 或 本地圖片
+  src: string | ImageMetadata;
   alt: string;
-  caption?: string; // 可選的說明文字
+  caption?: string;
 }
 
 const { src, alt, caption } = Astro.props;
-
-// 判斷是否為遠端 R2 圖片 (字串)
-const isRemoteImage = typeof src === 'string';
+const isRemote = typeof src === 'string';
 ---
 
 <figure class="blog-figure">
-  {/* 加入 inferSize={true} 讓 Astro 自動計算遠端圖片大小 */}
-  <Image 
-    src={src} 
-    alt={alt} 
-    inferSize={isRemoteImage} 
-    unoptimized={isRemoteImage} {/* <--- 加上這行：遠端圖片不經過 Astro 壓縮引擎 */}
-    class="rounded-image"
-  />
+  {
+    isRemote ? (
+      /* 如果是 R2 網址，直接輸出原生 img 標籤 */
+      <img src={src} alt={alt} class="rounded-image" loading="lazy" />
+    ) : (
+      /* 如果是本地圖片，交給 Astro 處理 */
+      <Image src={src} alt={alt} class="rounded-image" />
+    )
+  }
   {caption && <figcaption class="blog-caption">{caption}</figcaption>}
 </figure>
 
