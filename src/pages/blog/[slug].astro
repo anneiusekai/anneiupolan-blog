@@ -1,0 +1,58 @@
+---
+// src/pages/blog/[slug].astro
+import { env } from "cloudflare:workers";
+
+// 1. 從網址參數中取得 slug
+const { slug } = Astro.params;
+
+// 2. 取得 D1 資料庫連線
+const db = env.DB;
+
+// 3. 透過 SQL 查詢文章 (使用 ? 參數化查詢防止 SQL Injection)
+// 使用 .first() 只抓取第一筆符合的資料
+const article = await db.prepare(
+  "SELECT * FROM Articles WHERE Slug = ? AND IsPublished = 1"
+).bind(slug).first<{ 
+  Title: string, 
+  Content: string, 
+  HeroImage: string, 
+  CreatedAt: string 
+}>();
+
+// 4. 如果資料庫找不到這篇文章，回傳 404 找不到網頁
+if (!article) {
+  return new Response("揣無這篇文章 (404 Not Found)", { status: 404 });
+}
+---
+
+<html lang="zh-TW">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{article.Title} - 台語網誌</title>
+    <style>
+      body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; line-height: 1.6; }
+      .hero-img { width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin-bottom: 2rem; }
+      .date { color: #666; font-size: 0.9rem; }
+      .content { margin-top: 2rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/">← 轉去首頁</a>
+    </nav>
+
+    <article>
+      <h1>{article.Title}</h1>
+      <p class="date">發布時間：{new Date(article.CreatedAt).toLocaleDateString('zh-TW')}</p>
+
+      {/* 判斷有沒有封面圖，有才顯示 */}
+      {article.HeroImage && (
+        <img src={article.HeroImage} alt={`封面圖：${article.Title}`} class="hero-img" />
+      )}
+
+      {/* 關鍵：使用 set:html 來渲染從資料庫抓出來的 HTML/字串內容 */}
+      <div class="content" set:html={article.Content}></div>
+    </article>
+  </body>
+</html>
