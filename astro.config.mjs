@@ -15,6 +15,7 @@ export default defineConfig({
       // 把你的 R2.dev 網址貼在這裡（不要包含 https:// 和後面的路徑）
       domains: ['img.anneiusekai.com', 'pub-7e355146c9504fa4af57be0afd2a07ea.r2.dev'], 
 	},
-
+  
+  output: 'server',
   adapter: cloudflare()
 });
