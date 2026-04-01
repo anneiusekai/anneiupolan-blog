@@ -6,7 +6,7 @@ import { env } from "cloudflare:workers";
 const { slug } = Astro.params;
 
 // 2. 取得 D1 資料庫連線
-const db = env.DB;
+const db = env.anneiupolan_blog_db;
 
 // 3. 透過 SQL 查詢文章 (使用 ? 參數化查詢防止 SQL Injection)
 // 使用 .first() 只抓取第一筆符合的資料

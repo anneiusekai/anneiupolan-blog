@@ -22,7 +22,7 @@ if (Astro.request.method === "POST") {
       message = "❌ 標題、網址路徑與內容為必填！";
     } else {
       // 3. 直接從 env 取得 DB 綁定
-      const db = env.DB;
+      const db = env.anneiupolan_blog_db;
 
       // 4. 執行 SQL Insert 防範 SQL Injection (使用參數化查詢 ?)
       const { success } = await db.prepare(

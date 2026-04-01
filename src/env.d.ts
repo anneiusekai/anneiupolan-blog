@@ -6,7 +6,7 @@ type D1Database = import("@cloudflare/workers-types/experimental").D1Database;
 
 // 定義我們的環境變數綁定 (要跟 wrangler.toml 裡面的 binding 名稱一致)
 type ENV = {
-  DB: D1Database;
+  anneiupolan_blog_db: D1Database;
 };
 
 // 將綁定注入到 Astro 的 Locals 中
