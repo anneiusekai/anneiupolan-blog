@@ -1,19 +1,29 @@
 ---
-import { Image } from 'astro:assets';
-import { getCollection } from 'astro:content';
+// 1. 引入 Cloudflare 環境變數
+import { env } from "cloudflare:workers";
+
 import BaseHead from '../../components/BaseHead.astro';
 import Footer from '../../components/Footer.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
 import Header from '../../components/Header.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
 
-const posts = (await getCollection('blog')).sort(
-	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
-);
+// 2. 建立資料庫連線
+const db = env.anneiupolan_blog_db;
+
+// 3. 撈取所有已發布的文章，並依照建立時間 (CreatedAt) 由新到舊排序 (DESC)
+const { results: posts } = await db.prepare(
+  "SELECT Title, Slug, HeroImage, CreatedAt FROM Articles WHERE IsPublished = 1 ORDER BY CreatedAt DESC"
+).all<{ 
+  Title: string, 
+  Slug: string, 
+  HeroImage: string, 
+  CreatedAt: string 
+}>();
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="zh-TW">
 	<head>
 		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
 		<style>
@@ -49,6 +59,9 @@ const posts = (await getCollection('blog')).sort(
 			ul li img {
 				margin-bottom: 0.5rem;
 				border-radius: 12px;
+				/* 加入 object-fit 確保圖片比例不會因為外部連結而變形 */
+				object-fit: cover;
+				aspect-ratio: 2 / 1;
 			}
 			ul li a {
 				display: block;
@@ -94,13 +107,20 @@ const posts = (await getCollection('blog')).sort(
 					{
 						posts.map((post) => (
 							<li>
-								<a href={`/blog/${post.id}/`}>
-									{post.data.heroImage && (
-										<Image width={720} height={360} src={post.data.heroImage} alt="" />
+								{/* 4. 把 post.id 換成我們資料庫裡的 post.Slug */}
+								<a href={`/blog/${post.Slug}/`}>
+									
+									{/* 5. 圖片來源改成 post.HeroImage，並使用原生 img 標籤 */}
+									{post.HeroImage && (
+										<img width="720" height="360" src={post.HeroImage} alt={`封面圖：${post.Title}`} />
 									)}
-									<h4 class="title">{post.data.title}</h4>
+									
+									{/* 6. 綁定標題 */}
+									<h4 class="title">{post.Title}</h4>
+									
 									<p class="date">
-										<FormattedDate date={post.data.pubDate} />
+										{/* 7. 把資料庫的字串時間轉換為 Date 物件，交給組件格式化 */}
+										<FormattedDate date={new Date(post.CreatedAt)} />
 									</p>
 								</a>
 							</li>
