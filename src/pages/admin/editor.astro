@@ -48,7 +48,7 @@ if (Astro.request.method === "POST") {
         // 在 INSERT 語法中加入 UpdatedAt
         const now = new Date().toISOString();
 
-        await db.prepare(
+        const { success } = await db.prepare(
           "INSERT INTO Articles (Title, Slug, HeroImage, Content, IsPublished, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, 1, ?, ?)"
         ).bind(title, slug, heroImage, content, now, now).run();
 
@@ -139,6 +139,7 @@ if (Astro.request.method === "POST") {
         </div>
       ) : (
         <form method="POST">
+          <input type="hidden" name="action" value="publish" />
           <h1>📝 寫新ê文章</h1>
           <div class="form-group">
             <label for="title">文章標題</label>
@@ -157,9 +158,7 @@ if (Astro.request.method === "POST") {
 
           <div class="form-group">
             <label for="content">文章內容（支援 Markdown 佮 HTML 組件）</label>
-            <!--
-            <textarea id="content" name="content" rows="15" required placeholder='嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-definition="解說">較難ê詞</taigi-gloss>'></textarea>
-            -->
+            <p>嘛有支援 &lt;taigi-gloss&gt; 這个註解標籤喔！親像：&lt;taigi-gloss data-ruby="hoat-im" data-definition="解說"&gt較難ê詞&lt;/taigi-gloss&gt;，效果會變按呢：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss></p>
             <textarea id="content" name="content"></textarea>
           </div>
 
@@ -176,7 +175,7 @@ if (Astro.request.method === "POST") {
             uniqueId: "taigi-blog-draft", 
             delay: 3000,
           },
-          placeholder: '會用得揤「目睭」預覽看覓仔！\n\n嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss>'
+          placeholder: '會用得揤「目睭」預覽看覓仔！'
         });
 
         // B. 把我們在前台寫好的 Web Component 邏輯，也複製一份到後台來！
