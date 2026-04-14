@@ -76,11 +76,13 @@ const isRemote = typeof heroImage === 'string';
 				<div class="prose">
 					<div class="title">
 						<div class="date">
-							<FormattedDate date={pubDate} />
+							<div class="last-updated-on">
+								發表 <FormattedDate date={pubDate} />
+							</div>
 							{
 								updatedDate && (
 									<div class="last-updated-on">
-										Last updated on <FormattedDate date={updatedDate} />
+										修改 <FormattedDate date={updatedDate} />
 									</div>
 								)
 							}

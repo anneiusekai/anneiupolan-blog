@@ -7,11 +7,15 @@ import HeaderLink from './HeaderLink.astro';
 	<nav>
 		<h2><a href="/">{SITE_TITLE}</a></h2>
 		<div class="internal-links">
+			<HeaderLink href="/blog">Blog</HeaderLink>
+			<!--
 			<HeaderLink href="/">Home</HeaderLink>
 			<HeaderLink href="/blog">Blog</HeaderLink>
 			<HeaderLink href="/about">About</HeaderLink>
+			-->
 		</div>
 		<div class="social-links">
+			<!--
 			<a href="https://m.webtoo.ls/@astro" target="_blank">
 				<span class="sr-only">Follow Astro on Mastodon</span>
 				<svg viewBox="0 0 16 16" aria-hidden="true" width="32" height="32"
@@ -39,6 +43,7 @@ import HeaderLink from './HeaderLink.astro';
 					></path></svg
 				>
 			</a>
+			-->
 		</div>
 	</nav>
 </header>
@@ -63,6 +68,23 @@ import HeaderLink from './HeaderLink.astro';
 		align-items: center;
 		justify-content: space-between;
 	}
+	
+	/* 讓左邊和右邊的區域等寬，這樣中間就會被迫置中 */
+	h2, .social-links {
+		flex: 1; 
+	}
+
+	.internal-links {
+		display: flex;
+		justify-content: center; /* 確保中間內容在自己的區域內也置中 */
+		flex: 1;
+	}
+
+	.social-links {
+		display: flex;
+		justify-content: flex-end; /* 讓剩下的圖標（如果有）靠右 */
+	}
+
 	nav a {
 		padding: 1em 0.5em;
 		color: var(--black);

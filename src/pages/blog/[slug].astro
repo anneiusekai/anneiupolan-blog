@@ -41,6 +41,7 @@ if (!article && !errorMessage) {
     title={article.Title}
     description={article.Title} {/* 由於我們資料庫沒設 Description 欄位，先用標題頂替 */}
     pubDate={new Date(article.CreatedAt)}
+    updatedDate={new Date(article.UpdatedAt)}
     heroImage={article.HeroImage}
   >
     {/* 3. 這裡就是文章的本體，會被自動塞進 Layout 的 <slot /> 裡面 */}

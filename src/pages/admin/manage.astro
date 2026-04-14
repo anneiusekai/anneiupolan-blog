@@ -1,0 +1,91 @@
+---
+// src/pages/admin/manage.astro
+import { env } from "cloudflare:workers";
+
+import BaseHead from '../../components/BaseHead.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
+
+// 簡單門神校驗 (沿用你之前的 Cookie 邏輯)
+const authCookie = Astro.cookies.get('admin_auth')?.value;
+if (authCookie !== env.ADMIN_PASSWORD) return Astro.redirect('/admin/editor');
+
+const db = env.anneiupolan_blog_db;
+const { results: posts } = await db.prepare("SELECT Title, Slug FROM Articles ORDER BY CreatedAt DESC").all();
+---
+
+<html lang="zh-TW">
+<head>
+  <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
+</head>
+<body>
+  <Header />  
+  <main class="admin-container">
+    <style>
+      /* 3. 保留表單專用的 CSS，讓輸入框跟按鈕在主框架下依然好看 */
+      .admin-container { 
+        max-width: 800px; 
+        margin: 2rem auto; 
+        padding: 0 1rem; 
+      }
+      .form-group { margin-bottom: 1.5rem; }
+      label { 
+        display: block; 
+        margin-bottom: 0.5rem; 
+        font-weight: bold; 
+        color: var(--black); /* 使用 Astro 預設主題的變數 */
+      }
+      input[type="text"], textarea { 
+        width: 100%; 
+        padding: 0.75rem; 
+        border: 1px solid #ccc; 
+        border-radius: 6px; 
+        font-family: inherit;
+        font-size: 1rem;
+      }
+      button { 
+        background-color: #2b6cb0; 
+        color: white; 
+        padding: 0.75rem 1.5rem; 
+        border: none; 
+        border-radius: 6px; 
+        cursor: pointer; 
+        font-size: 1rem;
+        font-weight: bold;
+        transition: background-color 0.2s;
+      }
+      button:hover { background-color: #1a365d; }
+      .alert { 
+        padding: 1rem; 
+        margin-bottom: 1.5rem; 
+        border-radius: 6px; 
+        background-color: #ebf8ff; 
+        border: 1px solid #bee3f8; 
+        color: #2b6cb0;
+      }
+      
+      .post-item { 
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 15px; border-bottom: 1px solid #eee; 
+      }
+      .edit-btn { background: #2b6cb0; color: white; text-decoration: none; padding: 5px 15px; border-radius: 4px; }
+    </style>
+    <h1>🛠️ 文章管理後台</h1>
+    <a href="/admin/editor" style="display:inline-block; margin-bottom: 20px;">+ 新增文章</a>
+    
+    <div class="list">
+      {posts.map(post => (
+        <div class="post-item">
+          <span>{post.Title}</span>
+          <a href={`/admin/edit/${post.Slug}`} class="edit-btn">編輯</a>
+        </div>
+      ))}
+    </div>
+  </main>
+	<Footer />
+</body>
+</html>

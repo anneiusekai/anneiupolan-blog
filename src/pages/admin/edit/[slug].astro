@@ -1,72 +1,50 @@
 ---
-// src/pages/admin/editor.astro
+// src/pages/admin/edit/[slug].astro
 import { env } from "cloudflare:workers";
 
-// 1. 引入 Astro 範本預設的共用組件 (路徑請根據你的資料夾結構確認，通常是這樣)
-import BaseHead from '../../components/BaseHead.astro';
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
-import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
+import BaseHead from '../../../components/BaseHead.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../../../consts';
 
+const { slug } = Astro.params;
+const db = env.anneiupolan_blog_db;
 let message = "";
-const ADMIN_PWD = env.ADMIN_PASSWORD; // 從雲端環境變數抓密碼
 
-// 1. 檢查 Cookie 是否已經驗證過
-const authCookie = Astro.cookies.get('admin_auth')?.value;
-let isAuthenticated = !!ADMIN_PWD && authCookie === ADMIN_PWD;
+// 1. 權限檢查
+if (Astro.cookies.get('admin_auth')?.value !== env.ADMIN_PASSWORD) return Astro.redirect('/admin/editor');
 
-// 2. 處理各種 POST 請求
+// 2. 處理更新請求 (POST)
 if (Astro.request.method === "POST") {
   const formData = await Astro.request.formData();
-  const action = formData.get("action");
+  const title = formData.get("title")?.toString();
+  const newSlug = formData.get("newSlug")?.toString();
+  const content = formData.get("content")?.toString();
+  const heroImage = formData.get("heroImage")?.toString() || "";
 
-  // A. 處理登入驗證
-  if (action === "login") {
-    const password = formData.get("password")?.toString();
-    if (password === ADMIN_PWD) {
-      // 驗證成功，存入 Cookie (設定有效期限為 7 天)
-      Astro.cookies.set('admin_auth', password, { path: '/', maxAge: 60 * 60 * 24 * 7 });
-      isAuthenticated = true;
-    } else {
-      message = "❌ 暗號毋著喔，閣試一擺！";
-    }
-  } 
-  
-  // B. 處理文章發布 (只有驗證過的人才能跑這段)
-  else if (action === "publish" && isAuthenticated) {
-    try {
-      const title = formData.get("title")?.toString();
-      const slug = formData.get("slug")?.toString();
-      const heroImage = formData.get("heroImage")?.toString() || "";
-      const content = formData.get("content")?.toString();
+  try {
+    // 只更新 UpdatedAt，保留 CreatedAt
+    const now = new Date().toISOString();
 
-      if (!title || !slug || !content) {
-        message = "❌ 標題、網址路徑佮內容三項攏愛有！";
-      } else {
-        const db = env.anneiupolan_blog_db;
-
-        // 在 INSERT 語法中加入 UpdatedAt
-        const now = new Date().toISOString();
-
-        await db.prepare(
-          "INSERT INTO Articles (Title, Slug, HeroImage, Content, IsPublished, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, 1, ?, ?)"
-        ).bind(title, slug, heroImage, content, now, now).run();
-
-        if (success) {
-          message = "🎉 文章新增成功！";
-        } else {
-          message = "❌ 寫入資料庫失敗。";
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      message = `發生錯誤：${error instanceof Error ? error.message : '未知錯誤'}`;
-    }
+    await db.prepare(
+      "UPDATE Articles SET Title = ?, Slug = ?, Content = ?, HeroImage = ?, UpdatedAt = ? WHERE Slug = ?"
+    ).bind(title, newSlug, content, heroImage, now, slug).run();
+    
+    // 如果連網址路徑 (Slug) 都改了，要跳轉到新的編輯網址
+    if (newSlug !== slug) return Astro.redirect(`/admin/edit/${newSlug}?success=1`);
+    message = "✅ 修改成功！";
+  } catch (e) {
+    message = "❌ 更新失敗：" + (e instanceof Error ? e.message : "未知錯誤");
   }
 }
+
+// 3. 獲取舊資料 (用來填入表單)
+const article = await db.prepare("SELECT * FROM Articles WHERE Slug = ?").bind(slug).first();
+if (!article) return Astro.redirect('/admin/manage');
+
+// 如果是跳轉回來的，顯示成功訊息
+if (Astro.url.searchParams.get('success')) message = "✅ 修改成功！";
 ---
-
-
 
 <!doctype html>
 <html lang="zh-TW">
@@ -125,47 +103,34 @@ if (Astro.request.method === "POST") {
 
       {message && <div class="alert">{message}</div>}
 
-      {/* --- 門神把關：如果未驗證，只顯示登入框 --- */}
-      {!isAuthenticated ? (
-        <div class="login-box">
-          <h1>🔐 遮是私人ê後台</h1>
-          <p>請key管理員暗號：</p>
-          <form method="POST">
-            <input type="hidden" name="action" value="login" />
-            <input type="password" name="password" placeholder="暗號..." required />
-            <br />
-            <button type="submit" style="padding: 10px 20px;">進入</button>
-          </form>
+
+      <form method="POST">
+        <h1>📝 修改舊文章</h1>
+        <div class="form-group">
+          <label for="title">文章標題</label>
+          <input type="text" id="title" name="title" value={article.Title} placeholder="例如：我ê頭一篇" required />
         </div>
-      ) : (
-        <form method="POST">
-          <h1>📝 寫新ê文章</h1>
-          <div class="form-group">
-            <label for="title">文章標題</label>
-            <input type="text" id="title" name="title" placeholder="例如：我ê頭一篇" required />
-          </div>
 
-          <div class="form-group">
-            <label for="slug">網址路徑（Slug）（著愛是Lô-má字佮數字ê組合）</label>
-            <input type="text" id="slug" name="slug" placeholder="例如：my-first-article" required />
-          </div>
+        <div class="form-group">
+          <label for="slug">網址路徑（Slug）（著愛是Lô-má字佮數字ê組合）</label>
+          <input type="text" id="slug" name="newSlug" value={article.Slug} placeholder="例如：my-first-article" required />
+        </div>
 
-          <div class="form-group">
-            <label for="heroImage">封面圖片 R2 網址（選填）</label>
-            <input type="text" id="heroImage" name="heroImage" placeholder="https://img.yourdomain.com/photo.jpg" />
-          </div>
+        <div class="form-group">
+          <label for="heroImage">封面圖片 R2 網址（選填）</label>
+          <input type="text" id="heroImage" name="heroImage" value={article.HeroImage} placeholder="https://img.yourdomain.com/photo.jpg" />
+        </div>
 
-          <div class="form-group">
-            <label for="content">文章內容（支援 Markdown 佮 HTML 組件）</label>
-            <!--
-            <textarea id="content" name="content" rows="15" required placeholder='嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-definition="解說">較難ê詞</taigi-gloss>'></textarea>
-            -->
-            <textarea id="content" name="content"></textarea>
-          </div>
+        <div class="form-group">
+          <label for="content">文章內容（支援 Markdown 佮 HTML 組件）</label>          
+          <!--
+          <textarea id="content" name="content" rows="15" required placeholder='嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-definition="解說">較難ê詞</taigi-gloss>'></textarea>
+          -->
+          <textarea id="content" name="content">{article.Content}</textarea>
+        </div>
 
-          <button type="submit">💾 儲存發布</button>
-        </form>
-      )}
+        <button type="submit">💾 儲存修改</button>
+      </form>
       <script>
         // A. 將原本陽春的 textarea 升級為 EasyMDE 編輯器
         const easymde = new EasyMDE({ 
@@ -173,7 +138,7 @@ if (Astro.request.method === "POST") {
           spellChecker: false, // 建議關閉，避免中文/台語拼音被畫上紅色的錯誤底線
           autosave: {
             enabled: true, // 開啟自動暫存功能 (存在瀏覽器 LocalStorage)
-            uniqueId: "taigi-blog-draft", 
+            // 故意不設 uniqueId 
             delay: 3000,
           },
           placeholder: '會用得揤「目睭」預覽看覓仔！\n\n嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss>'
@@ -273,4 +238,3 @@ if (Astro.request.method === "POST") {
 		<Footer />
 	</body>
 </html>
-    
