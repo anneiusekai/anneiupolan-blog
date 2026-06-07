@@ -8,8 +8,6 @@
 
   class GoogleLoginButton extends HTMLElement {
     private user: User | null = null;
-    private userInfoDiv: HTMLElement | null = null;
-    private loginBtnDiv: HTMLElement | null = null;
 
     async connectedCallback() {
       this.render();
