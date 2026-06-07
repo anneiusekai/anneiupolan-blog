@@ -1,0 +1,46 @@
+---
+// 完整的评论区组件 - 整合登入、评论表单和列表
+import GoogleLoginButton from './GoogleLoginButton.astro';
+import CommentForm from './CommentForm.astro';
+import CommentList from './CommentList.astro';
+
+interface Props {
+  articleId: number | string;
+}
+
+const { articleId } = Astro.props;
+---
+
+<div class="comments-section">
+  <h2>留話區</h2>
+  
+  <div class="comments-form">
+    <CommentForm articleId={articleId} />
+  </div>
+
+  <div class="comments-list">
+    <CommentList articleId={articleId} />
+  </div>
+</div>
+
+<style>
+  .comments-section {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 2px solid #e0e0e0;
+  }
+
+  .comments-section h2 {
+    margin-bottom: 2rem;
+    font-size: 1.5rem;
+    color: #333;
+  }
+
+  .comments-form {
+    margin-bottom: 2rem;
+  }
+
+  .comments-list {
+    margin-top: 2rem;
+  }
+</style>

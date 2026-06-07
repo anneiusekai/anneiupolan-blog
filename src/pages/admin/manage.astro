@@ -12,7 +12,9 @@ const authCookie = Astro.cookies.get('admin_auth')?.value;
 if (authCookie !== env.ADMIN_PASSWORD) return Astro.redirect('/admin/editor');
 
 const db = env.anneiupolan_blog_db;
-const { results: posts } = await db.prepare("SELECT Title, Slug FROM Articles ORDER BY CreatedAt DESC").all();
+const posts = (await db
+  .prepare("SELECT Title, Slug FROM Articles ORDER BY CreatedAt DESC")
+  .all<{ Title: string; Slug: string }>()).results as { Title: string; Slug: string }[];
 ---
 
 <html lang="zh-TW">
@@ -59,6 +61,16 @@ const { results: posts } = await db.prepare("SELECT Title, Slug FROM Articles OR
         transition: background-color 0.2s;
       }
       button:hover { background-color: #1a365d; }
+      .primary-btn {
+        background-color: #2b6cb0;
+        color: white;
+        padding: 0.6rem 1.2rem;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: bold;
+      }
+      .primary-btn:hover { background-color: #1a365d; }
       .alert { 
         padding: 1rem; 
         margin-bottom: 1.5rem; 
@@ -73,9 +85,16 @@ const { results: posts } = await db.prepare("SELECT Title, Slug FROM Articles OR
         padding: 15px; border-bottom: 1px solid #eee; 
       }
       .edit-btn { background: #2b6cb0; color: white; text-decoration: none; padding: 5px 15px; border-radius: 4px; }
+      .logout-btn { background: #e53e3e; color: white; border: none; border-radius: 6px; padding: 0.75rem 1.2rem; cursor: pointer; }
+      .logout-btn:hover { background: #c53030; }
     </style>
     <h1>🛠️ 文章管理後台</h1>
-    <a href="/admin/editor" style="display:inline-block; margin-bottom: 20px;">+ 新增文章</a>
+    <div style="display:flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.5rem;">
+      <a href="/admin/editor" class="primary-btn">+ 新增文章</a>
+      <form method="post" action="/admin/logout" style="margin:0;">
+        <button type="submit" class="logout-btn">登出</button>
+      </form>
+    </div>
     
     <div class="list">
       {posts.map(post => (

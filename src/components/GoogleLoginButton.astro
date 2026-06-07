@@ -1,0 +1,274 @@
+---
+// Google 登录按钮组件 - 这是一个 Astro Island（使用 React/Web Component）
+---
+
+<script>
+  import { signInWithGoogle, signOut, getCurrentUser, getIdToken } from '../lib/firebase-auth';
+  import type { User } from 'firebase/auth';
+
+  class GoogleLoginButton extends HTMLElement {
+    private user: User | null = null;
+    private userInfoDiv: HTMLElement | null = null;
+    private loginBtnDiv: HTMLElement | null = null;
+
+    async connectedCallback() {
+      this.render();
+      await this.checkAuth();
+    }
+
+    private render() {
+      this.innerHTML = `
+        <div class="auth-container">
+          <div class="login-btn-container" id="login-container">
+            <button id="google-login-btn" class="btn-google">
+              用 Google Account 來 login
+            </button>
+          </div>
+          <div id="auth-error" class="auth-error" style="display: none;"></div>
+          <div class="user-info-container" id="user-info-container" style="display: none;">
+            <div class="user-info">
+              <img id="user-avatar" class="user-avatar" alt="User avatar" />
+              <span id="user-name" class="user-name"></span>
+            </div>
+            <button id="logout-btn" class="btn-logout">Logout</button>
+          </div>
+        </div>
+        <style>
+          .auth-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+          }
+
+          .btn-google {
+            padding: 0.5rem 1rem;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+          }
+
+          .btn-google:hover {
+            background-color: #3367d6;
+          }
+
+          .user-info-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+          }
+
+          .user-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+          }
+
+          .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+          }
+
+          .user-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+          }
+
+          .btn-logout {
+            padding: 0.4rem 0.8rem;
+            background-color: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background-color 0.2s;
+          }
+
+          .btn-logout:hover {
+            background-color: #ebebeb;
+          }
+          .auth-error {
+            margin-left: 0.5rem;
+            color: #d32f2f;
+            background: #fff0f0;
+            border: 1px solid #f2dede;
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            max-width: 420px;
+            word-break: break-word;
+          }
+        </style>
+      `;
+
+      this.setupEventListeners();
+    }
+
+    private setupEventListeners() {
+      const loginBtn = this.querySelector('#google-login-btn');
+      const logoutBtn = this.querySelector('#logout-btn');
+
+      loginBtn?.addEventListener('click', () => this.handleLogin());
+      logoutBtn?.addEventListener('click', () => this.handleLogout());
+    }
+
+    private async checkAuth() {
+      try {
+        this.user = await getCurrentUser();
+        this.updateUI();
+        
+        // 监听认证状态变化
+        window.addEventListener('authStateChanged', () => {
+          this.checkAuth();
+        });
+      } catch (error) {
+        console.error('Error checking auth:', error);
+      }
+    }
+
+    private disableLoginButton(isDisabled: boolean) {
+      const loginBtn = this.querySelector('#google-login-btn') as HTMLButtonElement;
+      if (loginBtn) {
+        loginBtn.disabled = isDisabled;
+        loginBtn.textContent = isDisabled ? '當咧login...' : '用 Google account 來 login';
+      }
+    }
+
+    private disableLogoutButton(isDisabled: boolean) {
+      const logoutBtn = this.querySelector('#logout-btn') as HTMLButtonElement;
+      if (logoutBtn) {
+        logoutBtn.disabled = isDisabled;
+        logoutBtn.textContent = isDisabled ? '當咧log out...' : 'Logout';
+      }
+    }
+
+    private async handleLogin() {
+      try {
+        const loginBtn = this.querySelector('#google-login-btn') as HTMLButtonElement;
+        this.disableLoginButton(true);
+
+        this.user = await signInWithGoogle();
+        this.updateUI();
+
+        // 触发自定义事件通知其他组件
+        window.dispatchEvent(new Event('authStateChanged'));
+        
+        this.disableLoginButton(false);
+      } catch (error) {
+        console.error('Login error:', error);
+        // display verbose error in UI
+        const errDiv = this.querySelector('#auth-error') as HTMLElement | null;
+        const diag = (error as any)?.diagnostic;
+        let text = 'login 失敗';
+        if (diag) {
+          text += `: ${diag.code || ''} ${diag.message || ''}`;
+          text += `\nUserAgent: ${diag.userAgent || 'n/a'}`;
+          text += `\nURL: ${diag.href || 'n/a'}`;
+          text += `\nTime: ${diag.time || ''}`;
+        } else if (error?.message) {
+          text += `: ${error.message}`;
+        }
+        if (errDiv) {
+          errDiv.textContent = text;
+          errDiv.setAttribute('style', 'display: block;');
+        } else {
+          alert('Login失敗，請重試一擺');
+        }
+        const loginBtn = this.querySelector('#google-login-btn') as HTMLButtonElement;
+        this.disableLoginButton(false);
+      }
+    }
+
+    private async notifyLoggedIn() {
+      try {
+        const token = await getIdToken();
+        window.dispatchEvent(new CustomEvent('userLoggedIn', {
+          detail: {
+            userId: this.user?.uid,
+            userName: this.user?.displayName || this.user?.email,
+            userEmail: this.user?.email,
+            userAvatar: this.user?.photoURL,
+            idToken: token,
+          }
+        }));
+      } catch (err) {
+        // still dispatch without token
+        window.dispatchEvent(new CustomEvent('userLoggedIn', {
+          detail: {
+            userId: this.user?.uid,
+            userName: this.user?.displayName || this.user?.email,
+            userEmail: this.user?.email,
+            userAvatar: this.user?.photoURL,
+            idToken: null,
+          }
+        }));
+      }
+    }
+
+    private async handleLogout() {
+      try {
+        const logoutBtn = this.querySelector('#logout-btn') as HTMLButtonElement;
+        this.disableLogoutButton(true);
+
+        await signOut();
+        this.user = null;
+        this.updateUI();
+
+        // 触发自定义事件
+        window.dispatchEvent(new Event('authStateChanged'));
+      } catch (error) {
+        console.error('Logout error:', error);
+        alert('Logout失敗，請重試一擺');
+        const logoutBtn = this.querySelector('#logout-btn') as HTMLButtonElement;
+        this.disableLogoutButton(false);
+      }
+    }
+
+    private updateUI() {
+      const loginContainer = this.querySelector('#login-container');
+      const userInfoContainer = this.querySelector('#user-info-container');      
+      
+      this.disableLogoutButton(this.user === null);
+      this.disableLoginButton(this.user !== null);
+
+      if (this.user) {
+        // 显示用户信息
+        loginContainer?.setAttribute('style', 'display: none !important');
+        userInfoContainer?.setAttribute('style', 'display: flex !important');
+
+        const avatar = this.querySelector('#user-avatar') as HTMLImageElement;
+        const name = this.querySelector('#user-name');
+
+        if (avatar && this.user.photoURL) {
+          avatar.src = this.user.photoURL;
+        }
+        if (name) {
+          name.textContent = this.user.displayName || this.user.email;
+        }
+
+        // 通知评论表单用户已登入（含 idToken）
+        this.notifyLoggedIn();
+      } else {
+        // 显示登录按钮
+        loginContainer?.setAttribute('style', 'display: block !important');
+        userInfoContainer?.setAttribute('style', 'display: none !important');
+
+        // 通知评论表单用户已登出
+        window.dispatchEvent(new Event('userLoggedOut'));
+      }
+    }
+  }
+
+  customElements.define('google-login-button', GoogleLoginButton);
+</script>
+
+<google-login-button />

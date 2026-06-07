@@ -1,0 +1,130 @@
+---
+// /src/pages/blog/tags/index.astro
+import type { CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
+import { env } from "cloudflare:workers";
+
+import BaseHead from '../../../components/BaseHead.astro';
+import Footer from '../../../components/Footer.astro';
+import Header from '../../../components/Header.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../../../consts';
+
+const allPosts = await getCollection('blog');
+
+interface TagInfo {
+  name: string;
+  slug: string;
+  count: number;
+}
+
+// 建立標籤映射
+const tagMap = new Map<string, number>();
+
+allPosts.forEach((post: CollectionEntry<'blog'>) => {
+  const tags = post.data.tags || [];
+  tags.forEach((tag) => {
+    tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+  });
+});
+
+const db = env.anneiupolan_blog_db;
+const { results } = await db.prepare(
+  "SELECT t.Name, COUNT(*) AS Count FROM Tags t JOIN ArticleTags at ON at.TagId = t.Id JOIN Articles a ON a.Id = at.ArticleId WHERE a.IsPublished = 1 GROUP BY t.Name, t.Slug"
+).all<{ Name: string; Count: number }>();
+
+const dbTagRows = results as { Name: string; Count: number }[];
+dbTagRows.forEach((row) => {
+  tagMap.set(row.Name, (tagMap.get(row.Name) || 0) + row.Count);
+});
+
+// 轉換為陣列並按計數排序
+const tags: TagInfo[] = Array.from(tagMap.entries())
+  .map(([name, count]) => ({
+    name,
+    slug: name.toLowerCase().replace(/\s+/g, '-'),
+    count,
+  }))
+  .sort((a, b) => b.count - a.count);
+---
+
+<!doctype html>
+<html lang="zh-TW">
+	<head>
+		<BaseHead title={`所有標籤 | ${SITE_TITLE}`} description="瀏覽所有文章標籤" />
+		<style>
+			main {
+				width: 960px;
+			}
+			.tags-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+				gap: 1.5rem;
+				margin: 2rem 0;
+			}
+			.tag-card {
+				display: flex;
+				flex-direction: column;
+				padding: 1.5rem;
+				background-color: rgba(var(--accent), 0.05);
+				border: 1px solid rgba(var(--accent), 0.2);
+				border-radius: 12px;
+				transition: all 0.3s ease;
+				cursor: pointer;
+				text-decoration: none;
+			}
+			.tag-card:hover {
+				background-color: rgba(var(--accent), 0.1);
+				border-color: rgba(var(--accent), 0.4);
+				transform: translateY(-4px);
+				box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+			}
+			.tag-name {
+				font-size: 1.25rem;
+				font-weight: 600;
+				color: rgb(var(--accent));
+				margin: 0 0 0.5rem 0;
+			}
+			.tag-count {
+				color: rgb(var(--gray));
+				font-size: 0.875rem;
+			}
+			.tag-count strong {
+				color: rgb(var(--black));
+				font-weight: 600;
+			}
+			@media (max-width: 720px) {
+				main {
+					width: 100%;
+				}
+				.tags-grid {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<section>
+				<h1>所有ê標籤</h1>
+				<p>攏總有 <strong>{tags.length}</strong> 个標籤</p>
+				
+				{tags.length > 0 ? (
+					<div class="tags-grid">
+						{tags.map((tag) => (
+							<a href={`/blog/tags/${tag.slug}`} class="tag-card">
+								<h3 class="tag-name">#{tag.name}</h3>
+								<p class="tag-count">
+									<strong>{tag.count}</strong> 篇文章
+								</p>
+							</a>
+						))}
+					</div>
+				) : (
+					<p>目前猶未有任何標籤。</p>
+				)}
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>

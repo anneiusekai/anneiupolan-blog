@@ -1,12 +1,28 @@
 ---
 // 1. 引入 Cloudflare 環境變數
+import type { CollectionEntry } from 'astro:content';
 import { env } from "cloudflare:workers";
+import { getCollection } from 'astro:content';
 
 import BaseHead from '../../components/BaseHead.astro';
 import Footer from '../../components/Footer.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
 import Header from '../../components/Header.astro';
+import TagCloud from '../../components/TagCloud.astro';
+import TagList from '../../components/TagList.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
+
+type ArticleRow = {
+  Title: string;
+  Slug: string;
+  HeroImage: string;
+  CreatedAt: string;
+};
+
+type ArticleTagRow = {
+  Slug: string;
+  Name: string;
+};
 
 // 2. 建立資料庫連線
 const db = env.anneiupolan_blog_db;
@@ -14,12 +30,56 @@ const db = env.anneiupolan_blog_db;
 // 3. 撈取所有已發布的文章，並依照建立時間 (CreatedAt) 由新到舊排序 (DESC)
 const { results: posts } = await db.prepare(
   "SELECT Title, Slug, HeroImage, CreatedAt FROM Articles WHERE IsPublished = 1 ORDER BY CreatedAt DESC"
-).all<{ 
-  Title: string, 
-  Slug: string, 
-  HeroImage: string, 
-  CreatedAt: string 
-}>();
+).all<ArticleRow>();
+
+const { results } = await db.prepare(
+  "SELECT a.Slug, t.Name FROM Articles a JOIN ArticleTags at ON at.ArticleId = a.Id JOIN Tags t ON t.Id = at.TagId WHERE a.IsPublished = 1"
+).all<ArticleTagRow>();
+
+const articleTagRows = results as ArticleTagRow[];
+const dbTagsMap = new Map<string, string[]>();
+articleTagRows.forEach((row) => {
+  const existing = dbTagsMap.get(row.Slug) || [];
+  dbTagsMap.set(row.Slug, Array.from(new Set([...existing, row.Name])));
+});
+
+// 4. 從 Content Collections 取得所有文章及其 tags
+const allBlogPosts = await getCollection('blog');
+
+// 5. 創建一個 slug 到 tags 的映射
+const postTagsMap = new Map<string, string[]>();
+allBlogPosts.forEach((post: CollectionEntry<'blog'>) => {
+  const slug = post.id.split('/')[0]; // 取得檔案名稱（不含 collection 路徑）
+  postTagsMap.set(slug, post.data.tags || []);
+});
+
+// 6. 將數據庫文章資訊與 tags 結合
+const postsWithTags: Array<ArticleRow & { tags: string[] }> = posts.map((post: ArticleRow) => {
+  const dbTags = dbTagsMap.get(post.Slug) || [];
+  const collectionTags = postTagsMap.get(post.Slug) || [];
+  const tags = Array.from(new Set([...collectionTags, ...dbTags]));
+
+  return {
+    ...post,
+    tags,
+  };
+});
+
+const tagCountMap = new Map<string, number>();
+postsWithTags.forEach((post: { tags: string[] }) => {
+  post.tags.forEach((tag: string) => {
+    tagCountMap.set(tag, (tagCountMap.get(tag) || 0) + 1);
+  });
+});
+
+const tagCounts = Array.from(tagCountMap.entries())
+  .map(([name, count]) => ({
+    name,
+    slug: name.toLowerCase().replace(/\s+/g, '-'),
+    count,
+  }))
+  .sort((a, b) => b.count - a.count)
+  .slice(0, 20);
 ---
 
 <!doctype html>
@@ -55,6 +115,9 @@ const { results: posts } = await db.prepare(
 			}
 			ul li:first-child .title {
 				font-size: 2.369rem;
+			}
+			ul li:first-child .tag-list {
+				width: 100%;
 			}
 			ul li img {
 				margin-bottom: 0.5rem;
@@ -103,9 +166,12 @@ const { results: posts } = await db.prepare(
 		<Header />
 		<main>
 			<section>
+				{/* 顯示標籤雲 */}
+				<TagCloud tags={tagCounts} />
+				
 				<ul>
 					{
-						posts.map((post) => (
+						postsWithTags.map((post: ArticleRow & { tags: string[] }) => (
 							<li>
 								{/* 4. 把 post.id 換成我們資料庫裡的 post.Slug */}
 								<a href={`/blog/${post.Slug}/`}>
@@ -123,6 +189,11 @@ const { results: posts } = await db.prepare(
 										<FormattedDate date={new Date(post.CreatedAt)} />
 									</p>
 								</a>
+								
+								{/* 8. 新增：顯示標籤列表 */}
+								{post.tags.length > 0 && (
+									<TagList class="tag-list" tags={post.tags} />
+								)}
 							</li>
 						))
 					}

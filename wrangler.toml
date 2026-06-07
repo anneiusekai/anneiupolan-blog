@@ -8,3 +8,7 @@ database_id = "4a5222ef-6bd5-4ef9-8889-a97ca3c9c63c"
 
 [vars]
 ADMIN_PASSWORD = "admin"
+PUBLIC_FIREBASE_API_KEY=AIzaSyDUiXCt2WTZ0ZRvQUgKvgFd7Qo2PTApeug
+PUBLIC_FIREBASE_PROJECT_ID=anneiupolan-blog
+PUBLIC_FIREBASE_APP_ID=1:276972943774:web:2d6257bf86cfd9b399fe8f
+PUBLIC_FIREBASE_AUTH_DOMAIN=anneiupolan-blog.firebaseapp.com

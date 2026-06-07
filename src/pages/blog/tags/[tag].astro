@@ -1,0 +1,267 @@
+---
+// /src/pages/blog/tags/[tag].astro
+import type { CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
+import { env } from "cloudflare:workers";
+
+import BaseHead from '../../../components/BaseHead.astro';
+import Footer from '../../../components/Footer.astro';
+import FormattedDate from '../../../components/FormattedDate.astro';
+import Header from '../../../components/Header.astro';
+import TagList from '../../../components/TagList.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../../../consts';
+
+export async function getStaticPaths() {
+  const allPosts = await getCollection('blog');
+  const tagSet = new Set<string>();
+
+  allPosts.forEach((post: CollectionEntry<'blog'>) => {
+    const tags = post.data.tags || [];
+    tags.forEach((tag) => {
+      tagSet.add(tag.toLowerCase().replace(/\s+/g, '-'));
+    });
+  });
+
+  const db = env.anneiupolan_blog_db;
+  const { results: dbTagResults } = await db.prepare(
+    "SELECT Slug FROM Tags"
+  ).all<{ Slug: string }>();
+
+  const dbTagRows = dbTagResults as { Slug: string }[];
+  dbTagRows.forEach((row) => tagSet.add(row.Slug));
+
+  return Array.from(tagSet).map((tag) => ({
+    params: { tag },
+  }));
+}
+
+const { tag } = Astro.params;
+
+// 取得所有文章
+const allPosts = await getCollection('blog');
+
+type ArticleRow = {
+  Title: string;
+  Slug: string;
+  HeroImage: string;
+  CreatedAt: string;
+};
+
+type ArticleTagRow = {
+  Slug: string;
+  Name: string;
+};
+
+// 取得資料庫連線
+const db = env.anneiupolan_blog_db;
+const { results: dbPosts } = await db.prepare(
+  "SELECT Title, Slug, HeroImage, CreatedAt FROM Articles WHERE IsPublished = 1 ORDER BY CreatedAt DESC"
+).all<ArticleRow>();
+
+const { results: dbTagResults } = await db.prepare(
+  "SELECT Name, Slug FROM Tags"
+).all<{ Name: string; Slug: string }>();
+
+const dbTagRows = dbTagResults as { Name: string; Slug: string }[];
+
+// 將 tag slug 轉回原始名稱
+const tagName = Array.from(
+  new Set(
+    [
+      ...allPosts.flatMap((post: CollectionEntry<'blog'>) => post.data.tags || []),
+      ...dbTagRows.map((row) => row.Name),
+    ]
+      .map((t) => ({ original: t, slug: t.toLowerCase().replace(/\s+/g, '-') }))
+  )
+).find((t) => t.slug === tag)?.original || tag;
+
+// 過濾出 collection 中包含此標籤的文章
+const filteredPosts = allPosts.filter((post: CollectionEntry<'blog'>) => {
+  const tags = post.data.tags || [];
+  return tags.some((t) => t.toLowerCase().replace(/\s+/g, '-') === tag);
+});
+
+// 取得 DB 中包含此標籤的文章
+const { results: dbPostsWithTag } = await db.prepare(
+  "SELECT a.Title, a.Slug, a.HeroImage, a.CreatedAt FROM Articles a JOIN ArticleTags at ON at.ArticleId = a.Id JOIN Tags t ON t.Id = at.TagId WHERE a.IsPublished = 1 AND t.Slug = ? ORDER BY a.CreatedAt DESC"
+).bind(tag).all<ArticleRow>();
+
+// 取得所有已發布文章的標籤映射
+const { results: dbPostTagResults } = await db.prepare(
+  "SELECT a.Slug, t.Name FROM Articles a JOIN ArticleTags at ON at.ArticleId = a.Id JOIN Tags t ON t.Id = at.TagId WHERE a.IsPublished = 1"
+).all<ArticleTagRow>();
+
+const dbPostTagRows = dbPostTagResults as ArticleTagRow[];
+const dbTagsMap = new Map<string, string[]>();
+dbPostTagRows.forEach((row) => {
+  const existing = dbTagsMap.get(row.Slug) || [];
+  dbTagsMap.set(row.Slug, Array.from(new Set([...existing, row.Name])));
+});
+
+// 創建標籤映射用於顯示每篇文章的所有標籤
+const postTagsMap = new Map<string, string[]>();
+filteredPosts.forEach((post: CollectionEntry<'blog'>) => {
+  const slug = post.id.split('/')[0];
+  postTagsMap.set(slug, post.data.tags || []);
+});
+
+dbPostsWithTag.forEach((post: ArticleRow) => {
+  const existing = postTagsMap.get(post.Slug) || [];
+  const tags = dbTagsMap.get(post.Slug) || [];
+  postTagsMap.set(post.Slug, Array.from(new Set([...existing, ...tags])));
+});
+
+const dbPostsForTag: ArticleRow[] = dbPostsWithTag;
+---
+
+<!doctype html>
+<html lang="zh-TW">
+	<head>
+		<BaseHead 
+			title={`標籤：${tagName} | ${SITE_TITLE}`} 
+			description={`${tagName} 相關的所有文章`} 
+		/>
+		<style>
+			main {
+				width: 960px;
+			}
+			.tag-header {
+				text-align: center;
+				margin-bottom: 2rem;
+				padding-bottom: 2rem;
+				border-bottom: 2px solid rgba(var(--accent), 0.3);
+			}
+			.tag-title {
+				font-size: 2.369rem;
+				color: rgb(var(--accent));
+				margin: 0;
+			}
+			.tag-subtitle {
+				color: rgb(var(--gray));
+				margin: 0.5rem 0 0 0;
+			}
+			.posts-list {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 2rem;
+				list-style-type: none;
+				margin: 0;
+				padding: 0;
+			}
+			.posts-list li {
+				width: calc(50% - 1rem);
+			}
+			.posts-list li * {
+				text-decoration: none;
+				transition: 0.2s ease;
+			}
+			.posts-list img {
+				margin-bottom: 0.5rem;
+				border-radius: 12px;
+				object-fit: cover;
+				aspect-ratio: 2 / 1;
+				width: 100%;
+			}
+			.posts-list a {
+				display: block;
+			}
+			.post-title {
+				margin: 0;
+				color: rgb(var(--black));
+				line-height: 1;
+				font-size: 1.25rem;
+			}
+			.post-date {
+				margin: 0.25rem 0 0 0;
+				color: rgb(var(--gray));
+				font-size: 0.875rem;
+			}
+			.posts-list li a:hover .post-title,
+			.posts-list li a:hover .post-date {
+				color: rgb(var(--accent));
+			}
+			.posts-list a:hover img {
+				box-shadow: var(--box-shadow);
+			}
+			.empty-state {
+				text-align: center;
+				padding: 3rem 0;
+				color: rgb(var(--gray));
+			}
+			.back-link {
+				display: inline-block;
+				margin-bottom: 1rem;
+				padding: 0.5rem 1rem;
+				background-color: rgba(var(--accent), 0.1);
+				color: rgb(var(--accent));
+				border-radius: 6px;
+				text-decoration: none;
+				transition: all 0.2s ease;
+			}
+			.back-link:hover {
+				background-color: rgba(var(--accent), 0.2);
+			}
+			@media (max-width: 720px) {
+				main {
+					width: 100%;
+				}
+				.posts-list {
+					gap: 0.5rem;
+				}
+				.posts-list li {
+					width: 100%;
+				}
+				.tag-title {
+					font-size: 1.563rem;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<section>
+				<a href="/blog/tags/" class="back-link">← 轉去所有ê標籤</a>
+				
+				<div class="tag-header">
+					<h1 class="tag-title">#{tagName}</h1>
+					<p class="tag-subtitle">攏總有 <strong>{dbPostsForTag.length}</strong> 篇文章</p>
+				</div>
+
+				{dbPostsForTag.length > 0 ? (
+					<ul class="posts-list">
+						{dbPostsForTag.map((post) => {
+							const postTags = postTagsMap.get(post.Slug) || [];
+							return (
+								<li>
+									<a href={`/blog/${post.Slug}/`}>
+										{post.HeroImage && (
+											<img 
+												width="720" 
+												height="360" 
+												src={post.HeroImage} 
+												alt={`封面圖：${post.Title}`} 
+											/>
+										)}
+										<h4 class="post-title">{post.Title}</h4>
+										<p class="post-date">
+											<FormattedDate date={new Date(post.CreatedAt)} />
+										</p>
+									</a>
+									{postTags.length > 0 && (
+										<TagList tags={postTags} />
+									)}
+								</li>
+							);
+						})}
+					</ul>
+				) : (
+					<div class="empty-state">
+						<p>這个標籤猶未有任何文章。</p>
+					</div>
+				)}
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>

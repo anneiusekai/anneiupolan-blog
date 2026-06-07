@@ -1,6 +1,10 @@
 ---
+import { env } from 'cloudflare:workers';
 import { SITE_TITLE } from '../consts';
 import HeaderLink from './HeaderLink.astro';
+
+const authCookie = Astro.cookies.get('admin_auth')?.value;
+const isAdmin = !!env.ADMIN_PASSWORD && authCookie === env.ADMIN_PASSWORD;
 ---
 
 <header>
@@ -8,6 +12,7 @@ import HeaderLink from './HeaderLink.astro';
 		<h2><a href="/">{SITE_TITLE}</a></h2>
 		<div class="internal-links">
 			<HeaderLink href="/blog">Blog</HeaderLink>
+			{isAdmin && <HeaderLink href="/admin/manage">Manage</HeaderLink>}
 			<!--
 			<HeaderLink href="/">Home</HeaderLink>
 			<HeaderLink href="/blog">Blog</HeaderLink>

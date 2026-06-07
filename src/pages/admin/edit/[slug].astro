@@ -5,14 +5,38 @@ import { env } from "cloudflare:workers";
 import BaseHead from '../../../components/BaseHead.astro';
 import Header from '../../../components/Header.astro';
 import Footer from '../../../components/Footer.astro';
+import WebComponents from '../../../components/WebComponents.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../../../consts';
 
 const { slug } = Astro.params;
 const db = env.anneiupolan_blog_db;
 let message = "";
 
+async function upsertTags(articleId: number, tags: string[]) {
+  for (const tag of tags) {
+    const slug = tag.toLowerCase().replace(/\s+/g, '-');
+    await db.prepare(
+      "INSERT OR IGNORE INTO Tags (Name, Slug) VALUES (?, ?)"
+    ).bind(tag, slug).run();
+
+    const tagRecord = await db.prepare(
+      "SELECT Id FROM Tags WHERE Slug = ?"
+    ).bind(slug).first<{ Id: number }>();
+
+    if (tagRecord?.Id) {
+      await db.prepare(
+        "INSERT OR IGNORE INTO ArticleTags (ArticleId, TagId) VALUES (?, ?)"
+      ).bind(articleId, tagRecord.Id).run();
+    }
+  }
+}
+
 // 1. 權限檢查
 if (Astro.cookies.get('admin_auth')?.value !== env.ADMIN_PASSWORD) return Astro.redirect('/admin/editor');
+
+// 3. 獲取舊資料 (用來填入表單)
+const article = await db.prepare("SELECT * FROM Articles WHERE Slug = ?").bind(slug).first();
+if (!article) return Astro.redirect('/admin/manage');
 
 // 2. 處理更新請求 (POST)
 if (Astro.request.method === "POST") {
@@ -21,6 +45,11 @@ if (Astro.request.method === "POST") {
   const newSlug = formData.get("newSlug")?.toString();
   const content = formData.get("content")?.toString();
   const heroImage = formData.get("heroImage")?.toString() || "";
+  const rawTags = formData.get("tags")?.toString() || "";
+  const tags = rawTags
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 
   try {
     // 只更新 UpdatedAt，保留 CreatedAt
@@ -29,6 +58,14 @@ if (Astro.request.method === "POST") {
     await db.prepare(
       "UPDATE Articles SET Title = ?, Slug = ?, Content = ?, HeroImage = ?, UpdatedAt = ? WHERE Slug = ?"
     ).bind(title, newSlug, content, heroImage, now, slug).run();
+
+    if (article?.Id) {
+      await db.prepare(
+        "DELETE FROM ArticleTags WHERE ArticleId = ?"
+      ).bind(article.Id).run();
+
+      await upsertTags(article.Id, tags);
+    }
     
     // 如果連網址路徑 (Slug) 都改了，要跳轉到新的編輯網址
     if (newSlug !== slug) return Astro.redirect(`/admin/edit/${newSlug}?success=1`);
@@ -38,12 +75,16 @@ if (Astro.request.method === "POST") {
   }
 }
 
-// 3. 獲取舊資料 (用來填入表單)
-const article = await db.prepare("SELECT * FROM Articles WHERE Slug = ?").bind(slug).first();
-if (!article) return Astro.redirect('/admin/manage');
-
 // 如果是跳轉回來的，顯示成功訊息
 if (Astro.url.searchParams.get('success')) message = "✅ 修改成功！";
+
+const { results } = await db.prepare(
+  "SELECT t.Name FROM Tags t JOIN ArticleTags at ON at.TagId = t.Id JOIN Articles a ON a.Id = at.ArticleId WHERE a.Slug = ?"
+).bind(slug).all<{ Name: string }>();
+
+const articleTagRows = results as { Name: string }[];
+const existingTags = articleTagRows.map((row) => row.Name);
+const tagsValue = existingTags.join(', ');
 ---
 
 <!doctype html>
@@ -122,6 +163,12 @@ if (Astro.url.searchParams.get('success')) message = "✅ 修改成功！";
         </div>
 
         <div class="form-group">
+          <label for="tags">標籤（用逗號分隔）</label>
+          <input type="text" id="tags" name="tags" value={tagsValue} placeholder="例如：Poland, Food, Travel" />
+          <p style="margin: 0.5rem 0 0; color: rgb(var(--gray)); font-size: 0.9rem;">輸入多個標籤時請用逗號分隔。</p>
+        </div>
+
+        <div class="form-group">
           <label for="content">文章內容（支援 Markdown 佮 HTML 組件）</label>          
           <!--
           <textarea id="content" name="content" rows="15" required placeholder='嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-definition="解說">較難ê詞</taigi-gloss>'></textarea>
@@ -131,8 +178,10 @@ if (Astro.url.searchParams.get('success')) message = "✅ 修改成功！";
 
         <button type="submit">💾 儲存修改</button>
       </form>
+      <WebComponents />
       <script>
         // A. 將原本陽春的 textarea 升級為 EasyMDE 編輯器
+        const EasyMDE = (window as any).EasyMDE;
         const easymde = new EasyMDE({ 
           element: document.getElementById('content'),
           spellChecker: false, // 建議關閉，避免中文/台語拼音被畫上紅色的錯誤底線
@@ -144,95 +193,6 @@ if (Astro.url.searchParams.get('success')) message = "✅ 修改成功！";
           placeholder: '會用得揤「目睭」預覽看覓仔！\n\n嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss>'
         });
 
-        // B. 把我們在前台寫好的 Web Component 邏輯，也複製一份到後台來！
-        // 這樣 EasyMDE 產生預覽畫面時，瀏覽器才知道怎麼把 <taigi-gloss> 變成漂亮的標籤
-        // --- 1. 註釋組件 (TaigiGloss) ---
-        class TaigiGloss extends HTMLElement {
-          constructor() {
-            super();
-            const shadow = this.attachShadow({ mode: 'open' });
-            const definition = this.dataset.definition || '';
-            const ruby = this.dataset.ruby || '';
-            const rubyHtml = ruby ? `<span class="ruby-text">${ruby}</span>` : '';
-
-            shadow.innerHTML = `<style>
-                .taigi-gloss { position: relative; display: inline-flex; align-items: baseline; gap: 0.25rem; cursor: help; color: #1f4e79; border-bottom: 1.5px dotted rgba(31, 78, 121, 0.45); transition: color 0.2s ease, border-color 0.2s ease; outline: none; }
-                .taigi-gloss:hover, .taigi-gloss:focus-visible { color: #163a5a; border-bottom-color: rgba(22, 58, 90, 0.8); }
-                .taigi-main { display: inline-flex; align-items: baseline; gap: 0.1rem; line-height: 1.6; }
-                .ruby-text { font-size: 0.85em; color: #718096; background: #edf2f7; padding: 0rem 0.2rem; border-radius: 999px; line-height: 1.2; white-space: nowrap; }
-                .gloss-tooltip { position: absolute; left: 50%; bottom: calc(100% + 0.7rem); transform: translateX(-50%) translateY(6px); width: max-content; max-width: min(240px, 80vw); white-space: normal; padding: 0.7rem 0.9rem; border-radius: 12px; background: rgba(26, 32, 44, 0.96); color: #f7fafc; font-size: 0.92rem; line-height: 1.55; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(0, 0, 0, 0.12); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease; z-index: 30; }
-                .gloss-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border-width: 7px; border-style: solid; border-color: rgba(26, 32, 44, 0.96) transparent transparent transparent; }
-                .taigi-gloss:hover .gloss-tooltip, .taigi-gloss:focus-visible .gloss-tooltip { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
-              </style><span class="taigi-gloss" tabindex="0"><span class="taigi-main"><slot></slot>${rubyHtml}</span><span class="gloss-tooltip" role="tooltip">${definition}</span></span>`;
-          }
-        }
-
-        // --- 2. 相簿網格組件 (PhotoGrid) ---
-        class PhotoGrid extends HTMLElement {
-          constructor() {
-            super();
-            const shadow = this.attachShadow({ mode: 'open' });
-            const cols = this.getAttribute('columns') || '1';
-            
-            shadow.innerHTML = `
-            <style>
-              :host {
-                display: grid !important; /* 強制啟動 Grid 模式 */
-                grid-template-columns: repeat(${cols}, 1fr);
-                gap: 1.5rem;
-                margin: 2rem 0;
-                width: 100%; /* 確保撐滿容器 */
-              }
-              
-              /* 響應式：手機版自動變 1 欄或 2 欄 */
-              @media (max-width: 640px) {
-                :host {
-                  grid-template-columns: repeat(min(${cols}, 2), 1fr);
-                  gap: 1rem;
-                }
-              }
-            </style>
-            <slot></slot>
-            `;
-          }
-        }
-
-        // --- 3. 圖片組件 (BlogImage) ---
-        class BlogImage extends HTMLElement {
-          constructor() {
-            super();
-            const shadow = this.attachShadow({ mode: 'open' });
-            const src = this.getAttribute('src');
-            const caption = this.getAttribute('caption');
-
-            shadow.innerHTML = `
-              <style>
-                .container { margin: 0; text-align: center; }
-                img { 
-                  width: 100%; 
-                  height: auto; 
-                  display: block; 
-                  border-radius: 8px; 
-                  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                }
-                figcaption {
-                  margin-top: 0.5rem;
-                  font-size: 0.9rem;
-                  color: #666;
-                  font-style: italic;
-                }
-              </style>
-              <figure class="container">
-                <img src="${src}" loading="lazy" />
-                ${caption ? `<figcaption>${caption}</figcaption>` : ''}
-              </figure>
-            `;
-          }
-        }
-
-        if (!customElements.get('taigi-gloss')) customElements.define('taigi-gloss', TaigiGloss);
-        if (!customElements.get('photo-grid')) customElements.define('photo-grid', PhotoGrid);
-        if (!customElements.get('blog-image')) customElements.define('blog-image', BlogImage);
       </script>
     </main>
 		<Footer />

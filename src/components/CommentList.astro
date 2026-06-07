@@ -1,0 +1,298 @@
+---
+// 评论列表组件 - Astro Island
+interface Props {
+  articleId: number | string;
+}
+
+const { articleId } = Astro.props;
+---
+
+<script define:vars={{ articleId }}>
+
+  class CommentList extends HTMLElement {
+    articleId = articleId;
+    comments = [];
+    isAdmin = false;
+    currentUserId = null;
+
+    async connectedCallback() {
+      this.render();
+      // 先檢查是否為 admin，確保後續載入留言時會渲染回覆表單
+      this.isAdmin = document.cookie.indexOf('admin_auth=') !== -1;
+      await this.loadComments();
+      this.setupEventListeners();
+    }
+
+    render() {
+      this.innerHTML = `
+        <div class="comment-list-container">
+          <h3>逐家留ê話</h3>
+          <div id="comments-loading" class="loading">
+            當咧load留話...
+          </div>
+          <div id="comments-list" class="comments-list" style="display: none;"></div>
+          <div id="no-comments" class="no-comments" style="display: none;">
+            這馬留話區猶空空，緊來留話！
+          </div>
+        </div>
+        <style>
+          .comment-list-container {
+            margin: 2rem 0;
+          }
+
+          .comment-list-container h3 {
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+            color: #333;
+          }
+
+          .loading {
+            text-align: center;
+            color: #999;
+            padding: 2rem;
+          }
+
+          .no-comments {
+            text-align: center;
+            color: #999;
+            padding: 2rem;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+          }
+
+          .comments-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+          }
+
+          .comment-item {
+            padding: 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background-color: #fafafa;
+          }
+
+          .comment-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+          }
+
+          .comment-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+          }
+
+          .comment-info {
+            flex: 1;
+          }
+
+          .comment-author {
+            flex: 1;
+            display: flex;
+          }
+
+          .comment-name {
+            font-weight: 500;
+            color: #333;
+            font-size: 0.95rem;
+          }
+
+          .comment-email {
+            margin-top: 0.23rem;
+            font-size: 0.8rem;
+            color: #999;
+          }
+
+          .comment-date {
+            font-size: 0.8rem;
+            color: #999;
+            margin-top: 0.25rem;
+          }
+
+          .comment-content {
+            color: #555;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+
+          /* 版主回覆樣式：字級較小且顏色一致 */
+          .comment-reply {
+            margin-top: 0.8rem;
+            padding: 0.6rem 0.75rem;
+            border-left: 3px solid #2b6cb0;
+            background: #f1f8ff;
+            border-radius: 4px;
+            color: #2b6cb0;
+            font-size: 1rem;
+            line-height: 1.4;
+          }
+
+          .comment-reply > div:first-child {
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+            font-size: 0.85rem;
+          }
+
+          .comment-reply > div:last-child {
+            font-size: 1rem;
+            white-space: pre-wrap;
+          }
+        </style>
+      `;
+    }
+
+    async loadComments() {
+      try {
+        const response = await fetch(`/api/comments?articleId=${encodeURIComponent(this.articleId)}`);
+        if (!response.ok) {
+          throw new Error('Failed to load comments');
+        }
+
+        this.comments = await response.json();
+        this.updateUI();
+      } catch (error) {
+        console.error('Load comments error:', error);
+        const loading = this.querySelector('#comments-loading');
+        if (loading) {
+          loading.textContent = '留話load失敗';
+        }
+      }
+    }
+
+    setupEventListeners() {
+      window.addEventListener('commentsUpdated', () => {
+        this.loadComments();
+      });
+
+      // Track login/logout to mark user's own comments
+      window.addEventListener('userLoggedIn', (e) => {
+        try {
+          this.currentUserId = e?.detail?.userId || null;
+        } catch (err) {
+          this.currentUserId = null;
+        }
+        this.updateUI();
+      });
+
+      window.addEventListener('userLoggedOut', () => {
+        this.currentUserId = null;
+        this.updateUI();
+      });
+    }
+
+    updateUI() {
+      const loading = this.querySelector('#comments-loading');
+      const list = this.querySelector('#comments-list');
+      const noComments = this.querySelector('#no-comments');
+
+      if (loading) loading.setAttribute('style', 'display: none !important');
+
+      if (this.comments.length === 0) {
+        noComments?.setAttribute('style', 'display: block !important');
+        list?.setAttribute('style', 'display: none !important');
+      } else {
+        noComments?.setAttribute('style', 'display: none !important');
+        list?.setAttribute('style', 'display: flex !important');
+        
+        if (list) {
+          list.innerHTML = this.comments.map(comment => this.renderComment(comment)).join('');
+
+          // attach reply form handlers if admin
+          if (this.isAdmin) {
+            const forms = list.querySelectorAll('.reply-form');
+            forms.forEach((formEl) => {
+              formEl.addEventListener('submit', async (ev) => {
+                ev.preventDefault();
+                const textarea = formEl.querySelector('textarea');
+                const btn = formEl.querySelector('button');
+                if (!textarea || !btn) return;
+                const reply = textarea.value.trim();
+                if (!reply) return alert('回覆著愛有字');
+                btn.disabled = true;
+                btn.textContent = '當咧送出去...';
+                try {
+                  const commentId = formEl.getAttribute('data-comment-id');
+                  const resp = await fetch('/api/comments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'reply', commentId: Number(commentId), replyContent: reply })
+                  });
+                  if (!resp.ok) {
+                    const txt = await resp.text();
+                    throw new Error(txt || '回覆失敗');
+                  }
+                  // reload comments
+                  this.loadComments();
+                } catch (e) {
+                  console.error(e);
+                  alert('回覆失敗');
+                } finally {
+                  btn.disabled = false;
+                  btn.textContent = '回覆';
+                }
+              });
+            });
+          }
+        }
+      }
+    }
+
+    renderComment(comment) {
+      const date = new Date(comment.createdAt);
+      const formattedDate = date.toLocaleDateString('zh-TW', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const replyHtml = comment.replyContent ? `
+          <div class="comment-reply" style="margin-top:0.8rem;padding:0.75rem;border-left:3px solid #2b6cb0;background:#f1f8ff;border-radius:4px;">
+            <div style="font-weight:600;color:#2b6cb0;margin-bottom:0.4rem;">版主ê回覆</div>
+            <div style="color:#2b6cb0;white-space:pre-wrap;">${this.escapeHtml(comment.replyContent)}</div>
+          </div>` : '';
+
+      const adminReplyForm = this.isAdmin && !comment.replyContent ? `
+          <form class="reply-form" data-comment-id="${comment.id}" style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-direction:column;">
+            <textarea placeholder="版主回覆拍佇遮..." rows="3" style="width:97.5%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;"></textarea>
+            <div style="display:flex;justify-content:flex-end;"><button type="submit" style="background:#2b6cb0;color:#fff;border:none;padding:0.5rem 0.75rem;border-radius:4px;">回覆</button></div>
+          </form>` : '';
+
+      const isMine = this.currentUserId && String(comment.userId) === String(this.currentUserId);
+      const nameHtml = `${this.escapeHtml(comment.userName)}${isMine ? '<span style="font-size:0.85rem;color:#666;">（我）</span>' : ''}`;
+
+      return `
+        <div class="comment-item">
+          <div class="comment-header">
+            ${comment.userAvatar ? `<img class="comment-avatar" src="${comment.userAvatar}" alt="${comment.userName}" />` : '<div class="comment-avatar" style="background-color: #ddd;"></div>'}
+            <div class="comment-info">
+              <div class="comment-author">
+                <div class="comment-name">${nameHtml}</div>
+                <div class="comment-email">${this.escapeHtml(comment.userEmail)}</div>
+              </div>
+              <div class="comment-date">${formattedDate}</div>
+            </div>
+          </div>
+          <div class="comment-content">${this.escapeHtml(comment.content)}</div>
+          ${replyHtml}
+          ${adminReplyForm}
+        </div>
+      `;
+    }
+
+    escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  }
+
+  customElements.define('comment-list', CommentList);
+</script>
+
+<comment-list />

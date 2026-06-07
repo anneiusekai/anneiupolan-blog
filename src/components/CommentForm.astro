@@ -1,0 +1,343 @@
+---
+import GoogleLoginButton from './GoogleLoginButton.astro';
+
+// 评论表单组件 - 普通 HTML 元件
+interface Props {
+  articleId: number | string;
+}
+
+const { articleId } = Astro.props;
+---
+
+<div class="comment-form-container" data-article-id={articleId}>
+  <h3>我嘛欲留話...</h3>
+  <div class="form-area">    
+    <div class="comments-auth">
+      <GoogleLoginButton />
+    </div>
+    <form id="comment-form" class="comment-form">
+      <div class="form-group">
+        <textarea
+          id="comment-content"
+          class="comment-textarea"
+          placeholder="留話拍佇遮..."
+          required
+          minlength="2"
+          maxlength="5000"
+        ></textarea>
+        <div class="textarea-help">
+
+          <span id="char-count">0</span> / 5000
+        </div>
+      </div>
+      <div class="button-area">
+        <button type="submit" class="btn-submit" id="submit-btn">送出去</button>
+      </div>
+    </form>
+  </div>
+  <details id="comment-debug" class="comment-debug" style="margin-top:1rem">
+    <summary style="cursor:pointer">Debug</summary>
+    <pre id="debug-content" style="white-space:pre-wrap;font-size:0.9rem;margin-top:0.5rem"></pre>
+  </details>
+</div>
+
+<style>
+  .comment-debug {
+    display: none;
+  }
+
+  .comments-auth {
+    margin: 1rem;
+    margin-left: 0rem;
+  }
+  
+  .comment-form {
+    display: none;
+    flex: 1;     /* 佔據剩餘所有空間 */
+  }
+
+  .comment-form-container {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: #fafafa;
+  }
+
+  .comment-form-container h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    color: #333;
+  }
+
+  .auth-required {
+    padding: 1rem;
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    border-radius: 4px;
+    color: #856404;
+  }
+  
+  
+  .form-area {
+    display: flex;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .comment-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  .comment-textarea:focus {
+    outline: none;
+    border-color: #4285f4;
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+  }
+
+  .textarea-help {
+    font-size: 0.8rem;
+    color: #999;
+    margin-top: 0.5rem;
+    text-align: right;
+  }
+
+  .button-area {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .btn-submit {
+    padding: 0.6rem 1.5rem;
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    align-items: right;
+  }
+
+  .btn-submit:hover:not(:disabled) {
+    background-color: #3367d6;
+  }
+
+  .btn-submit:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  .error-message {
+    color: #d32f2f;
+    padding: 0.75rem;
+    background-color: #ffebee;
+    border-left: 4px solid #d32f2f;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .success-message {
+    color: #2e7d32;
+    padding: 0.75rem;
+    background-color: #e8f5e9;
+    border-left: 4px solid #4caf50;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+</style>
+
+<script type="module" define:vars={{ articleId }}>
+  // receive auth info (including idToken) via window events from GoogleLoginButton
+
+  // 初始化
+  let isLoggedIn = false;
+  let currentUser = null;
+
+  async function initCommentForm() {
+    const container = document.querySelector('.comment-form-container');
+    if (!container) return;
+
+    const form = container.querySelector('#comment-form');
+    const textarea = container.querySelector('#comment-content');
+    const charCount = container.querySelector('#char-count');
+    const submitBtn = container.querySelector('#submit-btn');
+
+    // query debug panel early so we can show initial state immediately
+    const debugContent = container.querySelector('#debug-content');
+
+    if (!form || !textarea || !submitBtn) {
+      console.error('Comment form DOM missing required elements');
+      // still show debug panel if available
+      if (debugContent) debugContent.textContent = JSON.stringify({ error: 'DOM elements missing' }, null, 2);
+      return;
+    }
+    let lastIdToken = null;
+    let lastIdTokenFetchError = null;
+    let lastIdTokenFetchTime = null;
+
+    function maskToken(t) {
+      if (!t) return null;
+      try {
+        return `${t.slice(0, 8)}...${t.slice(-6)}`;
+      } catch (e) {
+        return '***';
+      }
+    }
+
+    function updateDebugPanel() {
+      if (!debugContent) return;
+      const payload = {
+        isLoggedIn: !!isLoggedIn,
+        currentUser: currentUser || null,
+        lastIdTokenExists: !!lastIdToken,
+        lastIdTokenMasked: maskToken(lastIdToken),
+        lastIdTokenFetchError: lastIdTokenFetchError || null,
+        lastIdTokenFetchTime: lastIdTokenFetchTime || null,
+      };
+      debugContent.textContent = JSON.stringify(payload, null, 2);
+    }
+
+    function updateFormVisibility() {
+      if (isLoggedIn && currentUser) {
+        form.style.display = 'block';
+      } else {
+        form.style.display = 'none';
+      }
+    }
+
+    function showMessage(text, type) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `${type}-message`;
+      messageDiv.textContent = text;
+      form.insertBefore(messageDiv, form.firstChild);
+      setTimeout(() => messageDiv.remove(), 5000);
+    }
+
+    // show initial debug state immediately so panel isn't empty when expanded
+    if (debugContent) debugContent.textContent = JSON.stringify({ isLoggedIn: !!isLoggedIn, currentUser: currentUser || null }, null, 2);
+    console.log('Comment form initialized', { isLoggedIn, currentUser });
+
+    // 字数计数
+    if (textarea) {
+      textarea.addEventListener('input', () => {
+        if (charCount) {
+          charCount.textContent = textarea.value.length;
+        }
+      });
+    }
+
+    // 表单提交
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (!isLoggedIn || !currentUser) {
+          alert('請你先login');
+          return;
+        }
+
+        const content = textarea.value.trim();
+        if (!content) {
+          alert('留話袂當是空--ê');
+          return;
+        }
+
+        try {
+          submitBtn.disabled = true;
+          submitBtn.textContent = '發表中...';
+
+          // token is provided by GoogleLoginButton via userLoggedIn event
+          const idToken = currentUser?.idToken || null;
+          lastIdToken = idToken;
+          lastIdTokenFetchError = idToken ? null : 'No token available on currentUser';
+          lastIdTokenFetchTime = new Date().toISOString();
+          updateDebugPanel();
+          console.log('Submitting comment', { articleId, content, idTokenExists: !!idToken, isLoggedIn, currentUser });
+
+          if (!idToken) {
+            throw new Error('Failed to get auth token (no idToken in user event)');
+          }
+
+          const response = await fetch('/api/comments', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              articleId: articleId,
+              content: content,
+            })
+          });
+
+          if (!response.ok) {
+            const errorBody = await response.text();
+            console.error('Submit comment response failed', response.status, errorBody);
+            throw new Error(errorBody || 'Failed to submit comment');
+          }
+
+          // keep token info visible after successful submit
+          lastIdTokenFetchTime = new Date().toISOString();
+          updateDebugPanel();
+
+          textarea.value = '';
+          if (charCount) {
+            charCount.textContent = '0';
+          }
+
+          showMessage('送出去--ah！', 'success');
+          window.dispatchEvent(new Event('commentsUpdated'));
+        } catch (error) {
+          console.error('Submit comment error:', error);
+          const message = error instanceof Error ? error.message : '送袂出去，請重來一擺';
+        showMessage(message, 'error');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = '送出去';
+        }
+      });
+    }
+
+    // 监听登入/登出，由 GoogleLoginButton 發送包含 idToken 的事件
+    window.addEventListener('userLoggedIn', (e) => {
+      console.log('User logged in');
+      currentUser = e.detail;
+      isLoggedIn = true;
+      lastIdToken = currentUser?.idToken || null;
+      lastIdTokenFetchError = lastIdToken ? null : lastIdTokenFetchError;
+      lastIdTokenFetchTime = new Date().toISOString();
+      updateFormVisibility();
+      updateDebugPanel();
+    });
+
+    window.addEventListener('userLoggedOut', () => {
+      console.log('User logged out');
+      isLoggedIn = false;
+      currentUser = null;
+      lastIdToken = null;
+      updateFormVisibility();
+      updateDebugPanel();
+    });
+    // no initial client-side getCurrentUser here; GoogleLoginButton will dispatch userLoggedIn on mount
+  }
+
+  // 页面加载完成后初始化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCommentForm);
+  } else {
+    initCommentForm();
+  }
+</script>

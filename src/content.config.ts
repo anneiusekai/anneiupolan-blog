@@ -17,6 +17,8 @@ const blog = defineCollection({
 			// 1. image() 會驗證本地相對路徑（如 ../../assets/pic.jpg）並回傳 Metadata
 			// 2. z.string().url() 則接受外部網址
 			heroImage: z.union([image(), z.string()]).optional(),
+			// 新增：文章標籤
+			tags: z.array(z.string()).default([]),
 		}),
 });
 

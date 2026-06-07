@@ -10,6 +10,26 @@ import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
 
 let message = "";
 const ADMIN_PWD = env.ADMIN_PASSWORD; // 從雲端環境變數抓密碼
+const db = env.anneiupolan_blog_db;
+
+async function upsertTags(articleId: number, tags: string[]) {
+  for (const tag of tags) {
+    const slug = tag.toLowerCase().replace(/\s+/g, '-');
+    await db.prepare(
+      "INSERT OR IGNORE INTO Tags (Name, Slug) VALUES (?, ?)"
+    ).bind(tag, slug).run();
+
+    const tagRecord = await db.prepare(
+      "SELECT Id FROM Tags WHERE Slug = ?"
+    ).bind(slug).first<{ Id: number }>();
+
+    if (tagRecord?.Id) {
+      await db.prepare(
+        "INSERT OR IGNORE INTO ArticleTags (ArticleId, TagId) VALUES (?, ?)"
+      ).bind(articleId, tagRecord.Id).run();
+    }
+  }
+}
 
 // 1. 檢查 Cookie 是否已經驗證過
 const authCookie = Astro.cookies.get('admin_auth')?.value;
@@ -25,7 +45,7 @@ if (Astro.request.method === "POST") {
     const password = formData.get("password")?.toString();
     if (password === ADMIN_PWD) {
       // 驗證成功，存入 Cookie (設定有效期限為 7 天)
-      Astro.cookies.set('admin_auth', password, { path: '/', maxAge: 60 * 60 * 24 * 7 });
+      Astro.cookies.set('admin_auth', password as string, { path: '/', maxAge: 60 * 60 * 24 * 7 });
       isAuthenticated = true;
     } else {
       message = "❌ 暗號毋著喔，閣試一擺！";
@@ -39,20 +59,26 @@ if (Astro.request.method === "POST") {
       const slug = formData.get("slug")?.toString();
       const heroImage = formData.get("heroImage")?.toString() || "";
       const content = formData.get("content")?.toString();
+      const rawTags = formData.get("tags")?.toString() || "";
+      const tags = rawTags
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
 
       if (!title || !slug || !content) {
         message = "❌ 標題、網址路徑佮內容三項攏愛有！";
       } else {
-        const db = env.anneiupolan_blog_db;
-
         // 在 INSERT 語法中加入 UpdatedAt
         const now = new Date().toISOString();
 
-        const { success } = await db.prepare(
+        const result = await db.prepare(
           "INSERT INTO Articles (Title, Slug, HeroImage, Content, IsPublished, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, 1, ?, ?)"
         ).bind(title, slug, heroImage, content, now, now).run();
 
-        if (success) {
+        const articleId = result.lastInsertRowId as number | undefined;
+
+        if (articleId) {
+          await upsertTags(articleId, tags);
           message = "🎉 文章新增成功！";
         } else {
           message = "❌ 寫入資料庫失敗。";
@@ -93,7 +119,7 @@ if (Astro.request.method === "POST") {
           font-weight: bold; 
           color: var(--black); /* 使用 Astro 預設主題的變數 */
         }
-        input[type="text"], textarea { 
+        input[type="text"], textarea, input[type="password"] { 
           width: 100%; 
           padding: 0.75rem; 
           border: 1px solid #ccc; 
@@ -101,6 +127,19 @@ if (Astro.request.method === "POST") {
           font-family: inherit;
           font-size: 1rem;
         }
+        .password { width: 220px; margin: 0 0 1rem; color: rgb(var(--gray)); }
+        .primary-btn {
+          background-color: #2b6cb0;
+          color: white;
+          padding: 0.6rem 1.1rem;
+          border-radius: 6px;
+          text-decoration: none;
+          display: inline-block;
+          font-weight: bold;
+          border: none;
+          cursor: pointer;
+        }
+        .primary-btn:hover { background-color: #1a365d; }
         button { 
           background-color: #2b6cb0; 
           color: white; 
@@ -129,12 +168,12 @@ if (Astro.request.method === "POST") {
       {!isAuthenticated ? (
         <div class="login-box">
           <h1>🔐 遮是私人ê後台</h1>
-          <p>請key管理員暗號：</p>
+          <p>請key管理員暗號</p>
           <form method="POST">
             <input type="hidden" name="action" value="login" />
-            <input type="password" name="password" placeholder="暗號..." required />
+            <input type="password" class="password" name="password" placeholder="暗號..." required />
             <br />
-            <button type="submit" style="padding: 10px 20px;">進入</button>
+            <button type="submit" class="primary-btn">進入</button>
           </form>
         </div>
       ) : (
@@ -157,6 +196,12 @@ if (Astro.request.method === "POST") {
           </div>
 
           <div class="form-group">
+            <label for="tags">標籤（用逗號分隔）</label>
+            <input type="text" id="tags" name="tags" placeholder="例如：Poland, Food, Travel" />
+            <p style="margin: 0.5rem 0 0; color: rgb(var(--gray)); font-size: 0.9rem;">輸入多個標籤時請用逗號分隔。</p>
+          </div>
+
+          <div class="form-group">
             <label for="content">文章內容（支援 Markdown 佮 HTML 組件）</label>
             <p>嘛有支援 &lt;taigi-gloss&gt; 這个註解標籤喔！親像：&lt;taigi-gloss data-ruby="hoat-im" data-definition="解說"&gt較難ê詞&lt;/taigi-gloss&gt;，效果會變按呢：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss></p>
             <textarea id="content" name="content"></textarea>
@@ -167,6 +212,7 @@ if (Astro.request.method === "POST") {
       )}
       <script>
         // A. 將原本陽春的 textarea 升級為 EasyMDE 編輯器
+        const EasyMDE = (window as any).EasyMDE;
         const easymde = new EasyMDE({ 
           element: document.getElementById('content'),
           spellChecker: false, // 建議關閉，避免中文/台語拼音被畫上紅色的錯誤底線

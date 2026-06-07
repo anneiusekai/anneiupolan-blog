@@ -1,0 +1,49 @@
+---
+// 顯示一個或多個標籤的組件
+interface Props {
+  tags: string[];
+  class?: string;
+}
+
+const { tags = [], class: className } = Astro.props;
+
+// 將標籤轉換為URL-safe的slug
+function tagToSlug(tag: string): string {
+  return tag.toLowerCase().replace(/\s+/g, '-');
+}
+---
+
+{tags.length > 0 && (
+  <div class:list={['tag-list', className]}>
+    {tags.map((tag) => (
+      <a href={`/blog/tags/${tagToSlug(tag)}`} class="tag">
+        #{tag}
+      </a>
+    ))}
+  </div>
+)}
+
+<style>
+  .tag-list {
+    gap: 0.3rem;
+    margin: 0.5rem -0.5rem;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background-color: rgba(var(--accent), 0.1);
+    color: rgb(var(--accent));
+    border-radius: 20px;
+    font-size: 0.875rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(var(--accent), 0.3);
+  }
+
+  .tag:hover {
+    background-color: rgba(var(--accent), 0.2);
+    border-color: rgba(var(--accent), 0.6);
+    transform: translateY(-1px);
+  }
+</style>
