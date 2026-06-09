@@ -6,6 +6,7 @@ import { env } from "cloudflare:workers";
 import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
+import ArticleForm from '../../components/ArticleForm.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
 
 let message = "";
@@ -106,28 +107,22 @@ if (Astro.request.method === "POST") {
 		<Header />
     <main class="admin-container">
       <style>
-        /* 3. 保留表單專用的 CSS，讓輸入框跟按鈕在主框架下依然好看 */
         .admin-container { 
           max-width: 800px; 
           margin: 2rem auto; 
           padding: 0 1rem; 
         }
-        .form-group { margin-bottom: 1.5rem; }
-        label { 
-          display: block; 
-          margin-bottom: 0.5rem; 
-          font-weight: bold; 
-          color: var(--black); /* 使用 Astro 預設主題的變數 */
+        .login-box {
+          text-align: center;
         }
-        input[type="text"], textarea, input[type="password"] { 
-          width: 100%; 
-          padding: 0.75rem; 
-          border: 1px solid #ccc; 
-          border-radius: 6px; 
-          font-family: inherit;
-          font-size: 1rem;
+        .password { 
+          width: 220px; 
+          margin: 0 0 1rem; 
+          color: rgb(var(--gray));
+          padding: 0.75rem;
+          border: 1px solid #ccc;
+          border-radius: 6px;
         }
-        .password { width: 220px; margin: 0 0 1rem; color: rgb(var(--gray)); }
         .primary-btn {
           background-color: #2b6cb0;
           color: white;
@@ -140,18 +135,6 @@ if (Astro.request.method === "POST") {
           cursor: pointer;
         }
         .primary-btn:hover { background-color: #1a365d; }
-        button { 
-          background-color: #2b6cb0; 
-          color: white; 
-          padding: 0.75rem 1.5rem; 
-          border: none; 
-          border-radius: 6px; 
-          cursor: pointer; 
-          font-size: 1rem;
-          font-weight: bold;
-          transition: background-color 0.2s;
-        }
-        button:hover { background-color: #1a365d; }
         .alert { 
           padding: 1rem; 
           margin-bottom: 1.5rem; 
@@ -164,7 +147,6 @@ if (Astro.request.method === "POST") {
 
       {message && <div class="alert">{message}</div>}
 
-      {/* --- 門神把關：如果未驗證，只顯示登入框 --- */}
       {!isAuthenticated ? (
         <div class="login-box">
           <h1>🔐 遮是私人ê後台</h1>
@@ -177,144 +159,8 @@ if (Astro.request.method === "POST") {
           </form>
         </div>
       ) : (
-        <form method="POST">
-          <input type="hidden" name="action" value="publish" />
-          <h1>📝 寫新ê文章</h1>
-          <div class="form-group">
-            <label for="title">文章標題</label>
-            <input type="text" id="title" name="title" placeholder="例如：我ê頭一篇" required />
-          </div>
-
-          <div class="form-group">
-            <label for="slug">網址路徑（Slug）（著愛是Lô-má字佮數字ê組合）</label>
-            <input type="text" id="slug" name="slug" placeholder="例如：my-first-article" required />
-          </div>
-
-          <div class="form-group">
-            <label for="heroImage">封面圖片 R2 網址（選填）</label>
-            <input type="text" id="heroImage" name="heroImage" placeholder="https://img.yourdomain.com/photo.jpg" />
-          </div>
-
-          <div class="form-group">
-            <label for="tags">標籤（用逗號分隔）</label>
-            <input type="text" id="tags" name="tags" placeholder="例如：Poland, Food, Travel" />
-            <p style="margin: 0.5rem 0 0; color: rgb(var(--gray)); font-size: 0.9rem;">輸入多個標籤時請用逗號分隔。</p>
-          </div>
-
-          <div class="form-group">
-            <label for="content">文章內容（支援 Markdown 佮 HTML 組件）</label>
-            <p>嘛有支援 &lt;taigi-gloss&gt; 這个註解標籤喔！親像：&lt;taigi-gloss data-ruby="hoat-im" data-definition="解說"&gt較難ê詞&lt;/taigi-gloss&gt;，效果會變按呢：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss></p>
-            <textarea id="content" name="content"></textarea>
-          </div>
-
-          <button type="submit">💾 儲存發布</button>
-        </form>
+        <ArticleForm mode="new" />
       )}
-      <script>
-        // A. 將原本陽春的 textarea 升級為 EasyMDE 編輯器
-        const EasyMDE = (window as any).EasyMDE;
-        const easymde = new EasyMDE({ 
-          element: document.getElementById('content'),
-          spellChecker: false, // 建議關閉，避免中文/台語拼音被畫上紅色的錯誤底線
-          autosave: {
-            enabled: true, // 開啟自動暫存功能 (存在瀏覽器 LocalStorage)
-            uniqueId: "taigi-blog-draft", 
-            delay: 3000,
-          },
-          placeholder: '會用得揤「目睭」預覽看覓仔！'
-        });
-
-        // B. 把我們在前台寫好的 Web Component 邏輯，也複製一份到後台來！
-        // 這樣 EasyMDE 產生預覽畫面時，瀏覽器才知道怎麼把 <taigi-gloss> 變成漂亮的標籤
-        // --- 1. 註釋組件 (TaigiGloss) ---
-        class TaigiGloss extends HTMLElement {
-          constructor() {
-            super();
-            const shadow = this.attachShadow({ mode: 'open' });
-            const definition = this.dataset.definition || '';
-            const ruby = this.dataset.ruby || '';
-            const rubyHtml = ruby ? `<span class="ruby-text">${ruby}</span>` : '';
-
-            shadow.innerHTML = `<style>
-                .taigi-gloss { position: relative; display: inline-flex; align-items: baseline; gap: 0.25rem; cursor: help; color: #1f4e79; border-bottom: 1.5px dotted rgba(31, 78, 121, 0.45); transition: color 0.2s ease, border-color 0.2s ease; outline: none; }
-                .taigi-gloss:hover, .taigi-gloss:focus-visible { color: #163a5a; border-bottom-color: rgba(22, 58, 90, 0.8); }
-                .taigi-main { display: inline-flex; align-items: baseline; gap: 0.1rem; line-height: 1.6; }
-                .ruby-text { font-size: 0.85em; color: #718096; background: #edf2f7; padding: 0rem 0.2rem; border-radius: 999px; line-height: 1.2; white-space: nowrap; }
-                .gloss-tooltip { position: absolute; left: 50%; bottom: calc(100% + 0.7rem); transform: translateX(-50%) translateY(6px); width: max-content; max-width: min(240px, 80vw); white-space: normal; padding: 0.7rem 0.9rem; border-radius: 12px; background: rgba(26, 32, 44, 0.96); color: #f7fafc; font-size: 0.92rem; line-height: 1.55; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(0, 0, 0, 0.12); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease; z-index: 30; }
-                .gloss-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border-width: 7px; border-style: solid; border-color: rgba(26, 32, 44, 0.96) transparent transparent transparent; }
-                .taigi-gloss:hover .gloss-tooltip, .taigi-gloss:focus-visible .gloss-tooltip { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
-              </style><span class="taigi-gloss" tabindex="0"><span class="taigi-main"><slot></slot>${rubyHtml}</span><span class="gloss-tooltip" role="tooltip">${definition}</span></span>`;
-          }
-        }
-
-        // --- 2. 相簿網格組件 (PhotoGrid) ---
-        class PhotoGrid extends HTMLElement {
-          constructor() {
-            super();
-            const shadow = this.attachShadow({ mode: 'open' });
-            const cols = this.getAttribute('columns') || '1';
-            
-            shadow.innerHTML = `
-            <style>
-              :host {
-                display: grid !important; /* 強制啟動 Grid 模式 */
-                grid-template-columns: repeat(${cols}, 1fr);
-                gap: 1.5rem;
-                margin: 2rem 0;
-                width: 100%; /* 確保撐滿容器 */
-              }
-              
-              /* 響應式：手機版自動變 1 欄或 2 欄 */
-              @media (max-width: 640px) {
-                :host {
-                  grid-template-columns: repeat(min(${cols}, 2), 1fr);
-                  gap: 1rem;
-                }
-              }
-            </style>
-            <slot></slot>
-            `;
-          }
-        }
-
-        // --- 3. 圖片組件 (BlogImage) ---
-        class BlogImage extends HTMLElement {
-          constructor() {
-            super();
-            const shadow = this.attachShadow({ mode: 'open' });
-            const src = this.getAttribute('src');
-            const caption = this.getAttribute('caption');
-
-            shadow.innerHTML = `
-              <style>
-                .container { margin: 0; text-align: center; }
-                img { 
-                  width: 100%; 
-                  height: auto; 
-                  display: block; 
-                  border-radius: 8px; 
-                  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                }
-                figcaption {
-                  margin-top: 0.5rem;
-                  font-size: 0.9rem;
-                  color: #666;
-                  font-style: italic;
-                }
-              </style>
-              <figure class="container">
-                <img src="${src}" loading="lazy" />
-                ${caption ? `<figcaption>${caption}</figcaption>` : ''}
-              </figure>
-            `;
-          }
-        }
-
-        if (!customElements.get('taigi-gloss')) customElements.define('taigi-gloss', TaigiGloss);
-        if (!customElements.get('photo-grid')) customElements.define('photo-grid', PhotoGrid);
-        if (!customElements.get('blog-image')) customElements.define('blog-image', BlogImage);
-      </script>
-    </main>
 		<Footer />
 	</body>
 </html>

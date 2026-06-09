@@ -20,6 +20,7 @@
     "astro": "^6.0.5",
     "firebase": "^10.13.0",
     "sharp": "^0.34.3",
+    "commonmark": "^0.30.0",
     "wrangler": "^4.79.0"
   }
 }

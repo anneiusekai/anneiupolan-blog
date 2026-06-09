@@ -1,0 +1,147 @@
+---
+// src/components/ArticleForm.astro
+interface Props {
+  mode: 'new' | 'edit';
+  article?: {
+    Title: string;
+    Slug: string;
+    HeroImage: string;
+    Content: string;
+  };
+  tags?: string;
+}
+
+import WebComponents from './WebComponents.astro';
+
+const { mode, article, tags = '' } = Astro.props;
+
+const isNew = mode === 'new';
+const title = isNew ? '📝 寫新ê文章' : '📝 修改舊文章';
+const buttonText = isNew ? '💾 儲存發布' : '💾 儲存修改';
+const slugName = isNew ? 'slug' : 'newSlug';
+const action = isNew ? 'publish' : undefined;
+---
+
+<form method="POST">
+  {action && <input type="hidden" name="action" value={action} />}
+  <h1>{title}</h1>
+  
+  <div class="form-group">
+    <label for="title">文章標題</label>
+    <input 
+      type="text" 
+      id="title" 
+      name="title" 
+      value={isNew ? '' : article?.Title}
+      placeholder="例如：我ê頭一篇" 
+      required 
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="slug">網址路徑（Slug）（著愛是Lô-má字佮數字ê組合）</label>
+    <input 
+      type="text" 
+      id="slug" 
+      name={slugName}
+      value={isNew ? '' : article?.Slug}
+      placeholder="例如：my-first-article" 
+      required 
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="heroImage">封面圖片 R2 網址（選填）</label>
+    <input 
+      type="text" 
+      id="heroImage" 
+      name="heroImage" 
+      value={isNew ? '' : article?.HeroImage}
+      placeholder="https://img.yourdomain.com/photo.jpg" 
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="tags">標籤（用逗號分隔）</label>
+    <input 
+      type="text" 
+      id="tags" 
+      name="tags" 
+      value={tags}
+      placeholder="例如：Poland, Food, Travel" 
+    />
+    <p style="margin: 0.5rem 0 0; color: rgb(var(--gray)); font-size: 0.9rem;">輸入多個標籤時請用逗號分隔。</p>
+  </div>
+
+  <div class="form-group">
+    <label for="content">文章內容（支援 Markdown 佮 HTML 組件）</label>
+    <p>嘛有支援 &lt;taigi-gloss&gt; 這个註解標籤喔！親像：&lt;taigi-gloss data-ruby="hoat-im" data-definition="解說"&gt較難ê詞&lt;/taigi-gloss&gt;，效果會變按呢：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss></p>
+    <textarea id="content" name="content">{article?.Content}</textarea>
+  </div>
+  <script>
+  // A. 將原本陽春的 textarea 升級為 EasyMDE 編輯器
+  const EasyMDE = (window as any).EasyMDE;
+  const easymde = new EasyMDE({ 
+      element: document.getElementById('content'),
+      spellChecker: false, // 建議關閉，避免中文/台語拼音被畫上紅色的錯誤底線
+      autosave: {
+      enabled: true, // 開啟自動暫存功能 (存在瀏覽器 LocalStorage)
+      uniqueId: "taigi-blog-edit", 
+      delay: 3000,
+      },
+      placeholder: '會用得揤「目睭」預覽看覓仔！\n\n嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss>'
+  });
+
+  </script>
+  <WebComponents />
+
+  <button type="submit">{buttonText}</button>
+</form>
+
+<style>
+  form {
+    width: 100%;
+  }
+  
+  .form-group { 
+    margin-bottom: 1.5rem; 
+  }
+  
+  label { 
+    display: block; 
+    margin-bottom: 0.5rem; 
+    font-weight: bold; 
+    color: var(--black);
+  }
+  
+  input[type="text"], textarea { 
+    width: 100%; 
+    padding: 0.75rem; 
+    border: 1px solid #ccc; 
+    border-radius: 6px; 
+    font-family: inherit;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+  
+  textarea {
+    min-height: 300px;
+    resize: vertical;
+  }
+  
+  button { 
+    background-color: #2b6cb0; 
+    color: white; 
+    padding: 0.75rem 1.5rem; 
+    border: none; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  
+  button:hover { 
+    background-color: #1a365d; 
+  }
+</style>

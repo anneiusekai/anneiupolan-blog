@@ -8,6 +8,7 @@ import BlogPost from '../../layouts/BlogPost.astro';
 import WebComponents from '../../components/WebComponents.astro';
 import TagList from '../../components/TagList.astro';
 import Comments from '../../components/Comments.astro';
+import { Parser, HtmlRenderer } from 'commonmark';
 
 const authCookie = Astro.cookies.get('admin_auth')?.value;
 const isAdmin = !!env.ADMIN_PASSWORD && authCookie === env.ADMIN_PASSWORD;
@@ -47,6 +48,15 @@ try {
 if (!article && !errorMessage) {
   return new Response("揣無這篇文章 (404 Not Found)", { status: 404 });
 }
+
+// 將 Markdown 轉成 HTML（保留原始 HTML 以支援自定義 web components）
+const reader = new Parser();
+const writer = new HtmlRenderer();
+let contentHtml = '';
+if (article && typeof article.Content === 'string') {
+  const parsed = reader.parse(article.Content);
+  contentHtml = writer.render(parsed);
+}
 ---
 
 {/* 如果有報錯，顯示簡單的錯誤畫面 */}
@@ -72,7 +82,7 @@ if (!article && !errorMessage) {
     tags={postTags}
   >
     {/* 3. 這裡就是文章的本體，會被自動塞進 Layout 的 <slot /> 裡面 */}
-    <div class="prose" set:html={article.Content}></div>
+    <div class="prose" set:html={contentHtml}></div>
 
     {isAdmin && (
       <p style="margin-top: 2rem;">

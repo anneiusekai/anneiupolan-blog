@@ -15,6 +15,11 @@
     }
 
     private render() {
+      console.log('Firebase config in GoogleLoginButton:', {
+        authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
+        appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
+      });
       this.innerHTML = `
         <div class="auth-container">
           <div class="login-btn-container" id="login-container">
@@ -137,7 +142,7 @@
       const loginBtn = this.querySelector('#google-login-btn') as HTMLButtonElement;
       if (loginBtn) {
         loginBtn.disabled = isDisabled;
-        loginBtn.textContent = isDisabled ? '當咧login...' : '用 Google account 來 login';
+        loginBtn.textContent = isDisabled ? '當咧login...' : '用 Google Account 來 login';
       }
     }
 
@@ -162,6 +167,14 @@
         
         this.disableLoginButton(false);
       } catch (error) {
+        // 用户关闭了 Google 登入视窗，静默取消（不显示错误）
+        const errorCode = (error as any)?.code;
+        if (errorCode === 'auth/popup-closed-by-user' || errorCode === 'auth/cancelled-popup-request') {
+          console.log('User dismissed Google login popup');
+          this.disableLoginButton(false);
+          return;
+        }
+
         console.error('Login error:', error);
         // display verbose error in UI
         const errDiv = this.querySelector('#auth-error') as HTMLElement | null;

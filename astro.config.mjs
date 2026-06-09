@@ -22,4 +22,12 @@ export default defineConfig({
       enabled: true
     }
   }),
+  vite: {
+    optimizeDeps: {
+      include: ['commonmark']
+    },
+    ssr: {
+      noExternal: ['commonmark']
+    }
+  }
 });
