@@ -9,39 +9,62 @@ import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
 <html lang="en">
 	<head>
 		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+		<style>
+			.hero-image {
+				width: 80%;
+				display: block;     /* 將圖片轉換為區塊元素 */
+				margin-left: auto;  /* 左右外邊距自動自動平分 */
+				margin-right: auto;
+				margin-bottom: 1em;
+				border-radius: 12px;
+				box-shadow: var(--box-shadow);
+			}
+			.prose {
+				width: 720px;
+				max-width: calc(100% - 2em);
+				margin: auto;
+				padding: 1em;
+				color: rgb(var(--gray-dark));
+			}
+			.title {
+				margin-bottom: 1em;
+				padding: 0.1em 0;
+				text-align: center;
+				line-height: 1;
+			}
+			.title h1 {
+				margin: 0 0 0.5em 0;
+			}
+			.date {
+				margin-bottom: 0.5em;
+				color: rgb(var(--gray));
+			}
+			.last-updated-on {
+				font-style: italic;
+			}
+		</style>
 	</head>
 	<body>
 		<Header />
 		<main>
-			<h1>🧑‍🚀 Hello, Astronaut!</h1>
+			<h1 class="title">⛪安呢遊波蘭</h1>
+			<img src="https://img.anneiusekai.com/poland/general/logo.jpg" alt="logo" class="hero-image" />
 			<p>
-				Welcome to the official <a href="https://astro.build/">Astro</a> blog starter template. This template
-				serves as a lightweight, minimally-styled starting point for anyone looking to build a personal
-				website, blog, or portfolio with Astro.
+				你好！我ê名號做安--ê，一个自動化工程師，嘛是一位予公司開錢（…？）請出國𨑨迌的旅行者，遮就是我ê blog，用台灣話介紹波蘭！
 			</p>
 			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like Tailwind,
-				React, or Vue to your project.
+				佇遮我會分享我這幾逝去到波蘭旅行ê經驗，包含著我去過ê城市、景點、食物佮一寡文化體驗。
 			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
+			<p>下跤是我兩逝旅行的時間：</p>
 			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/content/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
+				<li>2025年2月 - 3月</li>
+				<li>2025年6月</li>
 			</ul>
 			<p>
-				Have fun! If you get stuck, remember to
-				<a href="https://docs.astro.build/">read the docs</a>
-				or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
+				毋知影波蘭會改變足濟袂？文章內底寫ê攏是我彼時陣ê經驗，若準有啥物無仝的所在，請以現時的狀況為主，嘛真歡迎你來佮我分享！
 			</p>
 			<p>
-				Looking for a blog template with a bit more personality? Check out
-				<a href="https://github.com/Charca/astro-blog-template">astro-blog-template</a>
-				by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
+				若是你有啥物指教建議，嘛歡迎你寄批 <a href="mailto:anneiusekai@gmail.com">anneiusekai@gmail.com</a> 來佮我聯絡！
 			</p>
 		</main>
 		<Footer />

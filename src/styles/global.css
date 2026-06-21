@@ -5,16 +5,37 @@
  */
 
 :root {
-	--accent: #2337ff;
-	--accent-dark: #000d8a;
+	/* 強調色：復古琥珀金（帶點微亮質感的暖黃，適合按鈕、hover 效果、重要標籤） */
+    --accent-amber: #d99126;
+
+    /* 深強調色：濃郁焦糖棕（適合強調色背景上的文字、超連結、或是按鈕的點擊/深色狀態） */
+    --accent-caramel: #8f5600;
+
 	--black: 15, 18, 25;
+
+	/* 原本的灰色調，已被替換為溫暖復古色系 */
+	/*
 	--gray: 96, 115, 159;
 	--gray-light: 229, 233, 240;
 	--gray-dark: 34, 41, 57;
 	--gray-gradient: rgba(var(--gray-light), 50%), #fff;
+	*/
+
+	/* 基礎背景：溫暖的復古米杏色（原 --gray-light） */
+    --gray-light: 242, 230, 209;
+
+    /* 主色調：濃郁的復古紅棕色（原 --gray） */
+    --gray: 140, 50, 27;
+
+    /* 深色調/文字色：深沉的黑褐色（原 --gray-dark） */
+    --gray-dark: 38, 20, 16;
+
+    /* 新的漸層：米杏色微光漸層（原 --gray-gradient） */
+    --gray-gradient: rgba(var(--gray-light), 50%), #fff;
+	
 	--box-shadow:
-		0 2px 6px rgba(var(--gray), 25%), 0 8px 24px rgba(var(--gray), 33%),
-		0 16px 32px rgba(var(--gray), 33%);
+		0 2px 6px rgba(var(--gray-dark), 25%), 0 8px 24px rgba(var(--gray-dark), 33%),
+		0 16px 32px rgba(var(--gray-dark), 33%);
 }
 @font-face {
 	font-family: "Atkinson";
@@ -56,7 +77,7 @@ h4,
 h5,
 h6 {
 	margin: 0 0 0.5rem 0;
-	color: rgb(var(--black));
+	color: rgb(var(--gray-dark));
 	line-height: 1.2;
 }
 h1 {
@@ -79,10 +100,10 @@ b {
 	font-weight: 700;
 }
 a {
-	color: var(--accent);
+	color: var(--accent-caramel);
 }
 a:hover {
-	color: var(--accent);
+	color: var(--accent-amber);
 }
 p {
 	margin-bottom: 1em;
@@ -118,7 +139,7 @@ pre > code {
 	all: unset;
 }
 blockquote {
-	border-left: 4px solid var(--accent);
+	border-left: 4px solid var(--accent-caramel);
 	padding: 0 0 0 20px;
 	margin: 0;
 	font-size: 1.333em;
