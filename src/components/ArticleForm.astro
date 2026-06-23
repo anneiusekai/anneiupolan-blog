@@ -22,7 +22,7 @@ const slugName = isNew ? 'slug' : 'newSlug';
 const action = isNew ? 'publish' : undefined;
 ---
 
-<form method="POST">
+<form id="article-form" method="POST" data-article-slug={article?.Slug ?? ''} data-form-mode={mode}>
   {action && <input type="hidden" name="action" value={action} />}
   <h1>{title}</h1>
   
@@ -81,15 +81,24 @@ const action = isNew ? 'publish' : undefined;
   <script>
   // A. 將原本陽春的 textarea 升級為 EasyMDE 編輯器
   const EasyMDE = (window as any).EasyMDE;
+  // Build a per-form uniqueId so autosave entries don't collide across forms.
+  // Read server-provided values from the form's data-* attributes to avoid
+  // injecting server expressions directly into the client <script>.
+  const formEl = document.getElementById('article-form');
+  const articleSlug = formEl?.dataset.articleSlug ?? '';
+  const formMode = formEl?.dataset.formMode ?? '';
+  function sanitizeId(s) { return String(s || '').replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase(); }
+  const uniqueId = `taigi-blog-${sanitizeId(formMode)}-${sanitizeId(articleSlug) || 'new'}`;
+
   const easymde = new EasyMDE({ 
       element: document.getElementById('content'),
       spellChecker: false, // 建議關閉，避免中文/台語拼音被畫上紅色的錯誤底線
       autosave: {
-      enabled: true, // 開啟自動暫存功能 (存在瀏覽器 LocalStorage)
-      uniqueId: "taigi-blog-edit", 
-      delay: 3000,
+        enabled: true, // 開啟自動暫存功能 (存在瀏覽器 LocalStorage)
+        uniqueId: uniqueId,
+        delay: 3000,
       },
-      placeholder: '會用得揤「目睭」預覽看覓仔！\n\n嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss>'
+      placeholder: `會用得揤「目睭」預覽看覓仔！\n\n嘛有支援<taigi-gloss>這个註解標籤喔！\n親像：<taigi-gloss data-ruby="hoat-im" data-definition="解說">較難ê詞</taigi-gloss>`
   });
 
   </script>
